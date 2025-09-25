@@ -2,7 +2,7 @@ using ProjectPlanning.Web.Services; // 👈 importante
 
 var builder = WebApplication.CreateBuilder(args);
 
-.
+
 builder.Services.AddControllersWithViews();
 
 
@@ -10,7 +10,7 @@ builder.Services.AddHttpClient<IBonitaApiService, BonitaApiService>();
 
 var app = builder.Build();
 
-.
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
