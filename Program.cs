@@ -1,10 +1,13 @@
-using ProjectPlanning.Web.Services; // 👈 importante
+using ProjectPlanning.Web.Services;
+using ProjectPlanning.DTOs;
 
 var builder = WebApplication.CreateBuilder(args);
 
 
 builder.Services.AddControllersWithViews();
 
+builder.Services.Configure<BonitaConfig>(
+    builder.Configuration.GetSection("Bonita"));
 
 builder.Services.AddHttpClient<IBonitaApiService, BonitaApiService>();
 

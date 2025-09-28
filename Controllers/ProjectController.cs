@@ -25,7 +25,7 @@ namespace ProjectPlanning.Controllers
                 TempData["ErrorMessage"] = "⚠️ Bonita BPM is not available. Please check the connection.";
             }
 
-            return View();
+            return View(new Project());
         }
 
         public async Task<IActionResult> ListProcesses()

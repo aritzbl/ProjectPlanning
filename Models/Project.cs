@@ -17,11 +17,8 @@ namespace ProjectPlanning.Web.Models
         [Required(ErrorMessage = "End date is required")]
         public DateTime EndDate { get; set; }
 
-        [Required(ErrorMessage = "Coverage type is required")]
-        public string CoverageType { get; set; }
-
-        [Required(ErrorMessage = "Coverage description is required")]
-        public string CoverageDescription { get; set; }
+        [Required(ErrorMessage = "Resource is required")]
+        public List<String> Resources { get; set; } = new List<String>();
 
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {
