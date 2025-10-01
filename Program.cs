@@ -16,7 +16,6 @@ builder.Services.AddHttpClient<IBonitaApiService, BonitaApiService>(client =>
 });
 
 var app = builder.Build();
-
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");

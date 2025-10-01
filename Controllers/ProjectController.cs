@@ -28,6 +28,20 @@ namespace ProjectPlanning.Controllers
             return View();
         }
 
+        public async Task<IActionResult> ListProcesses()
+        {
+            try
+            {
+                var processes = await _bonitaService.GetAvailableProcessesAsync();
+                return Json(processes);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error listing processes");
+                return Json(new { error = ex.Message });
+            }
+        }
+
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(Project project)
