@@ -1,19 +1,19 @@
-using System.Net;
 using ProjectPlanning.Web.Services;
+using ProjectPlanning.DTOs;
+using ProjectPlanning.Web.Data;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllersWithViews();
 
-builder.Services.AddHttpClient<IBonitaApiService, BonitaApiService>(client =>
-{
-    client.BaseAddress = new Uri(builder.Configuration["Bonita:BaseUrl"]!);
-})
-.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
-{
-    UseCookies = true,
-    CookieContainer = new CookieContainer()
-});
+builder.Services.Configure<BonitaConfig>(
+    builder.Configuration.GetSection("Bonita"));
+
+builder.Services.AddHttpClient<IBonitaApiService, BonitaApiService>();
+
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 var app = builder.Build();
 if (!app.Environment.IsDevelopment())

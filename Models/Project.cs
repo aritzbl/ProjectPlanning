@@ -1,15 +1,17 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace ProjectPlanning.Web.Models
 {
+    [Table("Projects")]
     public class Project : IValidatableObject
     {
         public int Id { get; set; }
 
         [Required(ErrorMessage = "Project name is required")]
-        public string Name { get; set; }
+    public string? Name { get; set; }
 
         [Required(ErrorMessage = "Start date is required")]
         public DateTime StartDate { get; set; }
@@ -17,11 +19,8 @@ namespace ProjectPlanning.Web.Models
         [Required(ErrorMessage = "End date is required")]
         public DateTime EndDate { get; set; }
 
-        [Required(ErrorMessage = "Coverage type is required")]
-        public string CoverageType { get; set; }
-
-        [Required(ErrorMessage = "Coverage description is required")]
-        public string CoverageDescription { get; set; }
+        [Required(ErrorMessage = "Resource is required")]
+        public List<String> Resources { get; set; } = new List<String>();
 
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {

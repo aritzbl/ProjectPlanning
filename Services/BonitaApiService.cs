@@ -59,7 +59,9 @@ namespace ProjectPlanning.Web.Services
                 // con esto se autentica, deberia estar funcionando
                 await AuthenticateAsync();
 
-                var processInstance = CreateProcessInstance(project);
+                var processId = await GetProcessDefinitionIdAsync();
+
+                var processInstance = CreateProcessInstance(project, processId);
                 var json = JsonSerializer.Serialize(processInstance, new JsonSerializerOptions
                 {
                     PropertyNamingPolicy = JsonNamingPolicy.CamelCase
@@ -67,7 +69,7 @@ namespace ProjectPlanning.Web.Services
 
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-                var response = await _httpClient.PostAsync($"API/bpm/process/{_config.ProcessDefinitionId}/instantiation", content);
+                var response = await _httpClient.PostAsync($"API/bpm/process/{processId}/instantiation", content);
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -175,6 +177,28 @@ namespace ProjectPlanning.Web.Services
             }
         }
 
+        public async Task<String> GetProcessDefinitionIdAsync()
+        {
+            // Usar el valor de ProcessDefinitionId como nombre del proceso
+            var processName = _config.ProcessDefinitionId; 
+
+            // Autenticar antes de consultar la API
+            await AuthenticateAsync();
+
+            var response = await _httpClient.GetAsync($"API/bpm/process?p=0&c=10&f=name={processName}");
+
+            response.EnsureSuccessStatusCode();
+
+            var json = await response.Content.ReadAsStringAsync();
+            var list = JsonSerializer.Deserialize<List<JsonElement>>(json);
+
+            if (list != null && list.Count > 0)
+            {
+                return list[0].GetProperty("id").GetString() ?? throw new Exception("Process ID is null");
+            }
+
+            throw new Exception($"Process '{processName}' not found in Bonita.");
+        }
 
         public async Task<List<BonitaProcess>> GetAvailableProcessesAsync()
         {
@@ -210,18 +234,17 @@ namespace ProjectPlanning.Web.Services
             }
         }
 
-        private BonitaProcessInstance CreateProcessInstance(Project project)
+        private BonitaProcessInstance CreateProcessInstance(Project project, String processId)
         {
             return new BonitaProcessInstance
             {
-                ProcessDefinitionId = _config.ProcessDefinitionId ?? string.Empty,
+                ProcessDefinitionId = processId.ToString(),
                 Variables = new List<BonitaVariable>
                 {
                     new() { Name = "projectName", Value = project.Name },
                     new() { Name = "startDate", Value = project.StartDate.ToString("yyyy-MM-dd") },
                     new() { Name = "endDate", Value = project.EndDate.ToString("yyyy-MM-dd") },
-                    new() { Name = "coverageType", Value = project.CoverageType },
-                    new() { Name = "coverageDescription", Value = project.CoverageDescription }
+                    new() { Name = "resources", Value = project.Resources },
                 }
             };
         }
