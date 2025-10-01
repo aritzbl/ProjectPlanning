@@ -11,7 +11,7 @@ namespace ProjectPlanning.Web.Models
         public int Id { get; set; }
 
         [Required(ErrorMessage = "Project name is required")]
-    public string? Name { get; set; }
+        public string? Name { get; set; }
 
         [Required(ErrorMessage = "Start date is required")]
         public DateTime StartDate { get; set; }
@@ -24,6 +24,24 @@ namespace ProjectPlanning.Web.Models
 
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {
+            // Verifico que las fechas esten en un rango del año actual a 15 años más
+            var today = DateTime.Today;
+            var maxYear = today.AddYears(15);
+            if (StartDate < today || StartDate > maxYear)
+            {
+                yield return new ValidationResult(
+                    $"Start date must be between {today:d} and {maxYear:d}.",
+                    new[] { nameof(StartDate) }
+                );
+            }
+            if (EndDate < today || EndDate > maxYear)
+            {
+                yield return new ValidationResult(
+                    $"End date must be between {today:d} and {maxYear:d}.",
+                    new[] { nameof(EndDate) }
+                );
+            }
+
             if (EndDate < StartDate)
             {
                 yield return new ValidationResult(
