@@ -1,29 +1,15 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ProjectPlanning.Web.Data;
 using ProjectPlanning.Web.Models;
 using ProjectPlanning.Web.Services;
+using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
-using System.IdentityModel.Tokens.Jwt;
 
 namespace ProjectPlanning.Web.Controllers
 {
-    public class AuthViewController : Controller
-    {
-        // /AuthView/Register
-        public IActionResult Register()
-        {
-            return View();
-        }
-
-        // /AuthView/Login
-        public IActionResult Login()
-        {
-            return View();
-        }
-    }
-
     [ApiController]
     [Route("api/[controller]")]
     public class AuthController : ControllerBase
@@ -37,19 +23,16 @@ namespace ProjectPlanning.Web.Controllers
             _jwtService = jwtService;
         }
 
-        // REGISTER
+        // 🔹 REGISTER
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] User user)
         {
-            // ✅ Email already used?
             if (await _context.Users.AnyAsync(u => u.Email == user.Email))
                 return BadRequest(new { message = "Email already registered." });
 
-            // ✅ Validate password
             if (!IsValidPassword(user.Password))
                 return BadRequest(new { message = "Password must be at least 5 characters long and contain at least one number." });
 
-            // ✅ Hash and save
             user.Password = HashPassword(user.Password);
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
@@ -57,7 +40,7 @@ namespace ProjectPlanning.Web.Controllers
             return Ok(new { message = "User registered successfully." });
         }
 
-        // LOGIN
+        // 🔹 LOGIN
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
@@ -69,28 +52,30 @@ namespace ProjectPlanning.Web.Controllers
             return Ok(new { token });
         }
 
-        // PROFILE (protected route)
+        // 🔹 PROFILE (lee directamente desde el JWT)
         [HttpGet("profile")]
-        [Microsoft.AspNetCore.Authorization.Authorize]
-        public async Task<IActionResult> Profile()
+        [Authorize]
+        public IActionResult Profile()
         {
-            var email = User.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Email)?.Value;
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+            // Tomar email y booleano directamente desde los claims del token
+            var email = User.FindFirst(ClaimTypes.Email)?.Value;
+            var isOfferingOngClaim = User.FindFirst("isOfferingOng")?.Value;
 
-            if (user == null)
-                return NotFound();
+            bool isOfferingOng = false;
+            if (!string.IsNullOrEmpty(isOfferingOngClaim))
+                bool.TryParse(isOfferingOngClaim, out isOfferingOng);
+
+            if (string.IsNullOrEmpty(email))
+                return Unauthorized(new { message = "No email found in token." });
 
             return Ok(new
             {
-                user.Id,
-                user.Email,
-                user.Name,
-                user.Organization,
-                user.IsOfferingOng
+                Email = email,
+                IsOfferingOng = isOfferingOng
             });
         }
 
-        // 🔐 Helper methods
+        // 🔸 Helpers
         private static string HashPassword(string password)
         {
             using var sha256 = SHA256.Create();
@@ -104,7 +89,6 @@ namespace ProjectPlanning.Web.Controllers
             return hash == storedHash;
         }
 
-        // ✅ Password validation helper
         private static bool IsValidPassword(string password)
         {
             if (string.IsNullOrWhiteSpace(password)) return false;
@@ -112,7 +96,7 @@ namespace ProjectPlanning.Web.Controllers
         }
     }
 
-    // DTO for login
+    // 🔹 DTO for login
     public class LoginRequest
     {
         public string Email { get; set; } = string.Empty;

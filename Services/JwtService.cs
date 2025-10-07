@@ -1,8 +1,10 @@
+using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.Tokens;
+using ProjectPlanning.Web.Models;
+using System;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using Microsoft.IdentityModel.Tokens;
-using ProjectPlanning.Web.Models;
 
 namespace ProjectPlanning.Web.Services
 {
@@ -13,34 +15,38 @@ namespace ProjectPlanning.Web.Services
 
     public class JwtService : IJwtService
     {
-        private readonly IConfiguration _configuration;
+        private readonly string _jwtKey;
+        private readonly string _jwtIssuer;
+        private readonly string _jwtAudience;
 
         public JwtService(IConfiguration configuration)
         {
-            _configuration = configuration;
+            _jwtKey = configuration["Jwt:Key"] ?? throw new ArgumentNullException("Jwt:Key not configured");
+            _jwtIssuer = configuration["Jwt:Issuer"] ?? "ProjectPlanning";
+            _jwtAudience = configuration["Jwt:Audience"] ?? "ProjectPlanningUsers";
         }
 
         public string GenerateToken(User user)
         {
-            var jwtSettings = _configuration.GetSection("Jwt");
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Key"]!));
-            var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
             var claims = new[]
             {
-                new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-                new Claim(JwtRegisteredClaimNames.Email, user.Email),
-                new Claim("name", user.Name),
-                new Claim("organization", user.Organization),
-                new Claim("isOfferingOng", user.IsOfferingOng.ToString())
+                new Claim(ClaimTypes.Email, user.Email), // 👈 este es el que lee User.FindFirst(ClaimTypes.Email)
+                new Claim("isOfferingOng", user.IsOfferingOng.ToString().ToLower())
             };
 
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtKey));
+
+            if (key.KeySize < 128)
+                throw new ArgumentOutOfRangeException("Jwt:Key", "The JWT key must be at least 16 characters long (128 bits).");
+
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
             var token = new JwtSecurityToken(
-                issuer: jwtSettings["Issuer"],
-                audience: jwtSettings["Audience"],
+                issuer: _jwtIssuer,
+                audience: _jwtAudience,
                 claims: claims,
-                expires: DateTime.UtcNow.AddHours(4),
-                signingCredentials: credentials
+                expires: DateTime.UtcNow.AddHours(2),
+                signingCredentials: creds
             );
 
             return new JwtSecurityTokenHandler().WriteToken(token);

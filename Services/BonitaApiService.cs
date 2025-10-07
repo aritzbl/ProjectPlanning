@@ -56,7 +56,6 @@ namespace ProjectPlanning.Web.Services
         {
             try
             {
-                // con esto se autentica, deberia estar funcionando
                 await AuthenticateAsync();
 
                 var processId = await GetProcessDefinitionIdAsync();
@@ -117,30 +116,28 @@ namespace ProjectPlanning.Web.Services
 
                 if (response.IsSuccessStatusCode)
                 {
-                    // Extraer todas las cookies de la respuesta
+
                     if (response.Headers.TryGetValues("Set-Cookie", out var cookieHeaders))
                     {
                         var allCookies = string.Join("; ", cookieHeaders);
                         _logger.LogDebug("Received cookies: {Cookies}", allCookies);
 
-                        // Las cookies pueden venir en un solo header separadas por comas
+
                         var cookieString = string.Join(",", cookieHeaders);
-                        
-                        // Extraer JSESSIONID
+
                         var sessionMatch = System.Text.RegularExpressions.Regex.Match(cookieString, @"JSESSIONID=([^;,]+)");
                         if (sessionMatch.Success)
                         {
                             _sessionId = sessionMatch.Groups[1].Value;
                         }
 
-                        // Extraer X-Bonita-API-Token
+
                         var tokenMatch = System.Text.RegularExpressions.Regex.Match(cookieString, @"X-Bonita-API-Token=([^;,]+)");
                         if (tokenMatch.Success)
                         {
                             _apiToken = tokenMatch.Groups[1].Value;
                         }
 
-                        // Configurar headers para futuras requests
                         _httpClient.DefaultRequestHeaders.Remove("Cookie");
                         _httpClient.DefaultRequestHeaders.Remove("X-Bonita-API-Token");
                         
@@ -179,10 +176,8 @@ namespace ProjectPlanning.Web.Services
 
         public async Task<String> GetProcessDefinitionIdAsync()
         {
-            // Usar el valor de ProcessDefinitionId como nombre del proceso
             var processName = _config.ProcessDefinitionId; 
 
-            // Autenticar antes de consultar la API
             await AuthenticateAsync();
 
             var response = await _httpClient.GetAsync($"API/bpm/process?p=0&c=10&f=name={processName}");

@@ -15,7 +15,6 @@ namespace ProjectPlanning.Web.Models
 
         public string Organization { get; set; } = string.Empty;
 
-        // true = offering ONG, false = requesting ONG
         public bool IsOfferingOng { get; set; }
 
         [Required]
