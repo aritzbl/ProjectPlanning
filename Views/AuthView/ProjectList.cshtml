@@ -112,7 +112,6 @@
                 card.className = "card p-3 text-start";
                 card.innerHTML = `
                     <h5 class="fw-bold">${p.name}</h5>
-                    <p class="mb-1"><strong>Organization:</strong> ${p.organization ?? "N/A"}</p>
                     <p class="mb-1"><strong>Start Date:</strong> ${new Date(p.startDate).toLocaleDateString()}</p>
                     <p class="mb-2"><strong>End Date:</strong> ${new Date(p.endDate).toLocaleDateString()}</p>
                     <button class="btn btn-outline-primary btn-sm" onclick="viewDetails(${p.id})">🔍 View Details</button>
@@ -137,7 +136,6 @@
             document.getElementById("projectModalLabel").textContent = project.name;
             document.getElementById("projectModalBody").innerHTML = `
                 <p><strong>Organization:</strong> ${project.organization ?? "N/A"}</p>
-                <p><strong>Description:</strong><br>${project.description ?? "No description provided."}</p>
                 <p><strong>Start:</strong> ${new Date(project.startDate).toLocaleDateString()}</p>
                 <p><strong>End:</strong> ${new Date(project.endDate).toLocaleDateString()}</p>
             `;
