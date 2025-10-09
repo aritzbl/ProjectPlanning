@@ -61,8 +61,42 @@
         <button type="button" class="btn btn-primary btn-sm mb-4" onclick="addResource()">Add resource</button>
     </div>
 
-    <button type="submit" class="btn btn-primary">Save</button>
+    <div class="d-flex justify-content-between mt-4">
+        <button type="submit" class="btn btn-primary">Save</button>
+        <button type="button" class="btn btn-outline-secondary" onclick="goBack()">← Volver atrás</button>
+    </div>
 </form>
+<script>
+    async function checkOngAccess() {
+        const token = localStorage.getItem("jwt");
+        if (!token) {
+            window.location.href = "/AuthView/Login";
+            return;
+        }
+
+        const res = await fetch("http://localhost:5054/api/auth/profile", {
+            headers: { "Authorization": "Bearer " + token }
+        });
+
+        if (!res.ok) {
+            localStorage.removeItem("jwt");
+            window.location.href = "/AuthView/Login";
+            return;
+        }
+
+        const profile = await res.json();
+
+ 
+        if (!profile.isOfferingOng) {
+            window.location.href = "/AuthView/ProjectList"; 
+        }
+    }
+
+ 
+    checkOngAccess(); 
+</script>
+
+
 
 @section Scripts {
     @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
@@ -82,7 +116,7 @@
         input.name = `Resources[${resourceIndex}]`;
         input.placeholder = 'Descripción del recurso';
         input.classList.add('form-control', 'mb-1');
-        input.maxLength = 100; // límite de caracteres
+        input.maxLength = 100; 
 
         const removeBtn = document.createElement('button');
         removeBtn.type = 'button';
@@ -104,7 +138,7 @@
         if (element) element.remove();
     }
 
-    // Verifica que haya al menos un recurso antes de enviar
+    
     document.querySelector('form').addEventListener('submit', function(event) {
         const resources = document.querySelectorAll('#resource-list input[type="text"]');
         if (resources.length === 0) {

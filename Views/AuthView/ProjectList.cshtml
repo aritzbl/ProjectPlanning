@@ -72,7 +72,7 @@
         <p class="text-muted">Loading projects...</p>
     </div>
 
-    <!-- Modal -->
+    
     <div class="modal fade" id="projectModal" tabindex="-1" aria-labelledby="projectModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
@@ -84,6 +84,26 @@
             </div>
         </div>
     </div>
+    <script>
+    async function checkSession() {
+        const token = localStorage.getItem("jwt");
+        if (!token) {
+            window.location.href = "/AuthView/Login";
+            return;
+        }
+
+        const res = await fetch("http://localhost:5054/api/auth/profile", {
+            headers: { "Authorization": "Bearer " + token }
+        });
+
+        if (!res.ok) {
+            localStorage.removeItem("jwt");
+            window.location.href = "/AuthView/Login";
+        }
+    }
+
+    checkSession(); 
+</script>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
