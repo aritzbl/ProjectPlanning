@@ -30,26 +30,26 @@ namespace ProjectPlanning.Web.Services
         }
 
        public async Task<bool> IsBonitaAvailableAsync()
-{
-    try
-    {
-        var content = new FormUrlEncodedContent(new[]
         {
-            new KeyValuePair<string, string>("username", _config.Username),
-            new KeyValuePair<string, string>("password", _config.Password),
-            new KeyValuePair<string, string>("redirect", "false")
-        });
+            try
+            {
+                var content = new FormUrlEncodedContent(new[]
+                {
+                    new KeyValuePair<string, string>("username", _config.Username),
+                    new KeyValuePair<string, string>("password", _config.Password),
+                    new KeyValuePair<string, string>("redirect", "false")
+                });
 
-        var response = await _httpClient.PostAsync("loginservice", content);
+                var response = await _httpClient.PostAsync("loginservice", content);
 
-        return response.IsSuccessStatusCode;
-    }
-    catch (Exception ex)
-    {
-        _logger.LogError(ex, "Error checking Bonita availability");
-        return false;
-    }
-}
+                return response.IsSuccessStatusCode;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking Bonita availability");
+                return false;
+            }
+        }
 
 
         public async Task<string> StartProcessInstanceAsync(Project project)
