@@ -24,7 +24,6 @@ namespace ProjectPlanning.Web.Models
 
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {
-            // Verifico que las fechas esten en un rango del año actual a 15 años más
             var today = DateTime.Today;
             var maxYear = today.AddYears(15);
             if (StartDate < today || StartDate > maxYear)
