@@ -87,7 +87,7 @@
         const profile = await res.json();
 
  
-        if (!profile.isOfferingOng) {
+        if (profile.isOfferingOng) {
             window.location.href = "/AuthView/ProjectList"; 
         }
     }
