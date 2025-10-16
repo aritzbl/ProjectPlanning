@@ -1,129 +1,99 @@
 @{
     Layout = null;
 }
-
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Register - ProjectPlanning</title>
+    <title>Login - Bonita</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body {
-            background-color: #f7f8fa;
-            height: 100vh;
-            margin: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .card {
-            width: 100%;
-            max-width: 420px;
-            border: none;
-            border-radius: 15px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-            padding: 30px;
-        }
-
-        h3 {
-            font-weight: 600;
-        }
-
-        button {
-            background-color: #007bff;
-            border: none;
-        }
-
-        button:hover {
-            background-color: #0069d9;
-        }
-
-        a {
-            text-decoration: none;
-        }
-
-        a:hover {
-            text-decoration: underline;
-        }
-
-        #result {
-            font-weight: 500;
-        }
-    </style>
 </head>
-<body>
-    <div class="card">
-        <h3 class="text-center mb-4">Register</h3>
+<body class="d-flex align-items-center justify-content-center" style="min-height:100vh;background:#f7f8fa">
+    <div class="card p-4" style="max-width:420px;width:100%">
+        <h3 class="text-center mb-4">Login Bonita</h3>
 
-        <form id="registerForm">
+        <form id="loginForm" autocomplete="off">
             <div class="mb-3">
-                <label>Email</label>
-                <input type="email" class="form-control" id="email" required>
-            </div>
-            <div class="mb-3">
-                <label>Name</label>
-                <input type="text" class="form-control" id="name" required>
+                <label class="form-label">Username</label>
+                <input id="username" class="form-control" value="walter.bates" required />
             </div>
             <div class="mb-3">
-                <label>Organization</label>
-                <input type="text" class="form-control" id="organization" required>
+                <label class="form-label">Password</label>
+                <input id="password" type="password" class="form-control" value="bpm" required />
             </div>
-            <div class="form-check mb-3">
-                <input type="checkbox" class="form-check-input" id="isOfferingOng">
-                <label class="form-check-label">Is Offering ONG</label>
-            </div>
-            <div class="mb-3">
-                <label>Password</label>
-                <input type="password" class="form-control" id="password" required minlength="5" pattern="^(?=.*[0-9]).{5,}$" title="At least 5 characters and 1 number">
-            </div>
-
-            <button type="submit" class="btn btn-primary w-100">Register</button>
+            <button id="loginBtn" type="submit" class="btn btn-primary w-100">Login</button>
         </form>
 
-        <div id="result" class="mt-3 text-center text-success"></div>
-
-        <div class="text-center mt-3">
-            <a href="/AuthView/Login">Already have an account? Login</a>
-        </div>
+        <div id="result" class="mt-3 text-center"></div>
     </div>
 
     <script>
-        document.getElementById("registerForm").addEventListener("submit", async (e) => {
+        const form = document.getElementById("loginForm");
+        const btn = document.getElementById("loginBtn");
+        const resultDiv = document.getElementById("result");
+
+        form.addEventListener("submit", async (e) => {
             e.preventDefault();
 
-            const user = {
-                email: document.getElementById("email").value,
-                name: document.getElementById("name").value,
-                organization: document.getElementById("organization").value,
-                isOfferingOng: document.getElementById("isOfferingOng").checked,
+            btn.disabled = true;
+            btn.textContent = "Ingresando...";
+            resultDiv.textContent = "";
+            resultDiv.classList.remove("text-danger", "text-success");
+
+            const data = {
+                username: document.getElementById("username").value.trim(),
                 password: document.getElementById("password").value
             };
 
-            const resultDiv = document.getElementById("result");
-            resultDiv.textContent = "";
+            try {
+                const res = await fetch("/api/bonitaauth/login", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(data)
+                });
 
-            const res = await fetch("http://localhost:5054/api/auth/register", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(user)
-            });
-
-            if (res.ok) {
-                resultDiv.textContent = "✅ Registered successfully! Redirecting...";
-                resultDiv.classList.remove("text-danger");
-                resultDiv.classList.add("text-success");
-
-                setTimeout(() => {
-                    window.location.href = "/AuthView/Login";
-                }, 1500);
-            } else {
                 const json = await res.json();
-                resultDiv.textContent = "❌ " + (json.message || "Error registering user.");
-                resultDiv.classList.remove("text-success");
+                console.log("Respuesta del servidor:", json);
+
+                if (res.ok && json.sessionId && json.apiToken) {
+                    // Guardar en localStorage
+                    localStorage.setItem("bonitaSessionId", json.sessionId);
+                    localStorage.setItem("bonitaApiToken", json.apiToken);
+                    localStorage.setItem("bonitaUserId", json.userId ?? "");
+                    localStorage.setItem("bonitaUsername", data.username);
+                    
+                    // Guardar roles como JSON
+                    const roles = Array.isArray(json.roles) ? json.roles : [];
+                    localStorage.setItem("bonitaRoles", JSON.stringify(roles));
+                    console.log("Roles guardados:", roles);
+
+                    resultDiv.textContent = "✅ Login exitoso";
+                    resultDiv.classList.add("text-success");
+
+                    // Determinar redirección según roles
+                    const hasRole = (name) => roles.some(r => String(r).toLowerCase().includes(name.toLowerCase()));
+                    
+                    let goTo = "/AuthView/ProjectList"; // Por defecto: ONG que ofrece recursos
+                    
+                    if (hasRole("offering_projects") || hasRole("ONG_Offering_Projects")) {
+                        goTo = "/AuthView/OngMenu";
+                    }
+
+                    console.log("Redirigiendo a:", goTo);
+                    
+                    // Redirección inmediata sin setTimeout
+                    window.location.href = goTo;
+                    
+                } else {
+                    throw new Error(json.message || "Credenciales inválidas");
+                }
+            } catch (err) {
+                console.error("Error en login:", err);
+                resultDiv.textContent = "❌ " + (err.message || "Error de conexión");
                 resultDiv.classList.add("text-danger");
+                btn.disabled = false;
+                btn.textContent = "Login";
             }
         });
     </script>

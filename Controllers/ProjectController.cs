@@ -72,9 +72,8 @@ namespace ProjectPlanning.Controllers
             return View(project);
         }
 
-    
-        [HttpGet("/api/projects")]
-        [Microsoft.AspNetCore.Authorization.Authorize]
+        [HttpGet]
+        [Route("api/projects")]
         public async Task<IActionResult> GetAllProjects()
         {
             var projects = await _context.Projects
@@ -91,8 +90,8 @@ namespace ProjectPlanning.Controllers
             return Ok(projects);
         }
 
-        [HttpGet("/api/projects/{id}")]
-        [Microsoft.AspNetCore.Authorization.Authorize]
+        [HttpGet]
+        [Route("api/projects/{id}")]
         public async Task<IActionResult> GetProjectById(int id)
         {
             var project = await _context.Projects.FirstOrDefaultAsync(p => p.Id == id);

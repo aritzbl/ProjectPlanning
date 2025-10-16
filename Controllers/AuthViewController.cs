@@ -1,27 +1,27 @@
 using Microsoft.AspNetCore.Mvc;
 
-namespace ProjectPlanning.Web.Controllers
+namespace ProjectPlanning.Controllers
 {
     public class AuthViewController : Controller
     {
-        public IActionResult Register()
-        {
-            return View(); // Busca Views/AuthView/Register.cshtml
-        }
-
         public IActionResult Login()
         {
-            return View(); // Busca Views/AuthView/Login.cshtml
+            return View();
         }
 
         public IActionResult OngMenu()
         {
-            return View(); // Busca Views/AuthView/OngMenu.cshtml
+            return View();
         }
 
         public IActionResult ProjectList()
         {
-            return View(); // Busca Views/AuthView/ProjectList.cshtml
+            return View();
+        }
+
+        public IActionResult Logout()
+        {
+            return RedirectToAction("Login");
         }
     }
 }

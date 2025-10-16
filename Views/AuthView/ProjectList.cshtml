@@ -60,19 +60,19 @@
 </head>
 <body>
 
-    <!-- 🔹 Navbar con botón de logout -->
+    <!-- Navbar con botón de logout -->
     <nav class="navbar navbar-light bg-light d-flex justify-content-between px-4 py-2">
-        <span class="navbar-brand mb-0 h5">Project Planning</span>
+        <span class="navbar-brand mb-0 h5">Project Planning - Recursos</span>
         <button class="btn btn-outline-danger btn-sm" onclick="logout()">Cerrar sesión</button>
     </nav>
 
-    <h3>📋 Published Projects</h3>
+    <h3>📋 Proyectos Disponibles</h3>
 
     <div id="projectList" class="container text-center">
-        <p class="text-muted">Loading projects...</p>
+        <p class="text-muted">Cargando proyectos...</p>
     </div>
 
-    
+    <!-- Modal para detalles del proyecto -->
     <div class="modal fade" id="projectModal" tabindex="-1" aria-labelledby="projectModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
@@ -84,92 +84,104 @@
             </div>
         </div>
     </div>
-    <script>
-    async function checkSession() {
-        const token = localStorage.getItem("jwt");
-        if (!token) {
-            window.location.href = "/AuthView/Login";
-            return;
-        }
-
-        const res = await fetch("http://localhost:5054/api/auth/profile", {
-            headers: { "Authorization": "Bearer " + token }
-        });
-
-        if (!res.ok) {
-            localStorage.removeItem("jwt");
-            window.location.href = "/AuthView/Login";
-        }
-    }
-
-    checkSession(); 
-</script>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        async function loadProjects() {
-            const token = localStorage.getItem("jwt");
-            const res = await fetch("http://localhost:5054/api/projects", {
-                headers: { "Authorization": "Bearer " + token }
-            });
 
+        function checkBonitaSession() {
+            const sessionId = localStorage.getItem("bonitaSessionId");
+            const apiToken = localStorage.getItem("bonitaApiToken");
+            const rolesJson = localStorage.getItem("bonitaRoles");
+
+            console.log("Verificando sesión Bonita...");
+            console.log("SessionId:", sessionId ? "✓" : "✗");
+            console.log("ApiToken:", apiToken ? "✓" : "✗");
+
+            if (!sessionId || !apiToken) {
+                console.warn("No hay sesión, redirigiendo a login...");
+                window.location.href = "/AuthView/Login";
+                return false;
+            }
+
+            const roles = JSON.parse(rolesJson || "[]");
+            return true;
+        }
+
+        async function loadProjects() {
             const listDiv = document.getElementById("projectList");
 
-            if (!res.ok) {
-                listDiv.innerHTML = "<p class='text-danger'>❌ Error loading projects.</p>";
-                return;
-            }
+            try {
+                const res = await fetch("/api/projects");
 
-            const projects = await res.json();
-            if (projects.length === 0) {
-                listDiv.innerHTML = "<p class='text-muted'>No projects published yet.</p>";
-                return;
-            }
+                if (!res.ok) {
+                    listDiv.innerHTML = "<p class='text-danger'>❌ Error cargando proyectos.</p>";
+                    return;
+                }
 
-            listDiv.innerHTML = "";
-            projects.forEach(p => {
-                const card = document.createElement("div");
-                card.className = "card p-3 text-start";
-                card.innerHTML = `
-                    <h5 class="fw-bold">${p.name}</h5>
-                    <p class="mb-1"><strong>Start Date:</strong> ${new Date(p.startDate).toLocaleDateString()}</p>
-                    <p class="mb-2"><strong>End Date:</strong> ${new Date(p.endDate).toLocaleDateString()}</p>
-                    <button class="btn btn-outline-primary btn-sm" onclick="viewDetails(${p.id})">🔍 View Details</button>
-                `;
-                listDiv.appendChild(card);
-            });
+                const projects = await res.json();
+                
+                if (projects.length === 0) {
+                    listDiv.innerHTML = "<p class='text-muted'>No hay proyectos publicados aún.</p>";
+                    return;
+                }
+
+                listDiv.innerHTML = "";
+                projects.forEach(p => {
+                    const card = document.createElement("div");
+                    card.className = "card p-3 text-start";
+                    card.innerHTML = `
+                        <h5 class="fw-bold">${p.name}</h5>
+                        <p class="mb-1"><strong>Fecha Inicio:</strong> ${new Date(p.startDate).toLocaleDateString('es-ES')}</p>
+                        <p class="mb-2"><strong>Fecha Fin:</strong> ${new Date(p.endDate).toLocaleDateString('es-ES')}</p>
+                        <button class="btn btn-outline-primary btn-sm" onclick="viewDetails(${p.id})">🔍 Ver Detalles</button>
+                    `;
+                    listDiv.appendChild(card);
+                });
+            } catch (error) {
+                console.error("Error cargando proyectos:", error);
+                listDiv.innerHTML = "<p class='text-danger'>❌ Error de conexión.</p>";
+            }
         }
 
         async function viewDetails(id) {
-            const token = localStorage.getItem("jwt");
-            const res = await fetch(`http://localhost:5054/api/projects/${id}`, {
-                headers: { "Authorization": "Bearer " + token }
-            });
+            try {
+                const res = await fetch(`/api/projects/${id}`);
 
-            if (!res.ok) {
-                alert("⚠️ Error loading project details.");
-                return;
+                if (!res.ok) {
+                    alert("⚠️ Error cargando detalles del proyecto.");
+                    return;
+                }
+
+                const project = await res.json();
+
+                document.getElementById("projectModalLabel").textContent = project.name;
+                document.getElementById("projectModalBody").innerHTML = `
+                    <p><strong>Inicio:</strong> ${new Date(project.startDate).toLocaleDateString('es-ES')}</p>
+                    <p><strong>Fin:</strong> ${new Date(project.endDate).toLocaleDateString('es-ES')}</p>
+                    <p><strong>Recursos:</strong></p>
+                    <ul>
+                        ${project.resources && project.resources.length > 0 
+                            ? project.resources.map(r => `<li>${r}</li>`).join('') 
+                            : '<li class="text-muted">Sin recursos definidos</li>'}
+                    </ul>
+                `;
+
+                const modal = new bootstrap.Modal(document.getElementById('projectModal'));
+                modal.show();
+            } catch (error) {
+                console.error("Error:", error);
+                alert("⚠️ Error cargando detalles del proyecto.");
             }
-
-            const project = await res.json();
-
-            document.getElementById("projectModalLabel").textContent = project.name;
-            document.getElementById("projectModalBody").innerHTML = `
-                <p><strong>Organization:</strong> ${project.organization ?? "N/A"}</p>
-                <p><strong>Start:</strong> ${new Date(project.startDate).toLocaleDateString()}</p>
-                <p><strong>End:</strong> ${new Date(project.endDate).toLocaleDateString()}</p>
-            `;
-
-            const modal = new bootstrap.Modal(document.getElementById('projectModal'));
-            modal.show();
         }
 
         function logout() {
-            localStorage.removeItem("jwt");
+            localStorage.clear();
             window.location.href = "/AuthView/Login";
         }
 
-        loadProjects();
+        if (checkBonitaSession()) {
+            loadProjects();
+        }
     </script>
 </body>
 </html>

@@ -1,159 +1,227 @@
 @model ProjectPlanning.Web.Models.Project
 
 @{
-    
     ViewData["Title"] = "Create Project";
 }
 
-<h2>Create Project</h2>
-
-
-@if (TempData["SuccessMessage"] != null)
-{
-    <div class="alert alert-success">
-        @TempData["SuccessMessage"]
-    </div>
-}
-@if (TempData["ErrorMessage"] != null)
-{
-    <div class="alert alert-danger">
-        @TempData["ErrorMessage"]
-    </div>
-}
-
-<form asp-action="Create" method="post">
-    <div class="form-group">
-        <label asp-for="Name"></label>
-        <input asp-for="Name" class="form-control" maxlength="30"/>
-        <span asp-validation-for="Name" class="text-danger"></span>
-    </div>
-
-    <div class="form-group">
-        <label asp-for="StartDate"></label>
-        <input asp-for="StartDate" type="date" class="form-control" />
-        <span asp-validation-for="StartDate" class="text-danger"></span>
-    </div>
-
-    <div class="form-group">
-        <label asp-for="EndDate"></label>
-        <input asp-for="EndDate" type="date" class="form-control" />
-        <span asp-validation-for="EndDate" class="text-danger"></span>
-    </div>
-
-    <div class="form-group">
-        <label>Resources</label>
-        <div id="resource-list">
-            @if (Model.Resources != null && Model.Resources.Count > 0) {
-                @for (int i = 0; i < Model.Resources.Count; i++)
-                {
-                    <div class="resource-item" id="resource-@i">
-                        <input type="text" 
-                            name="Resources[@i]" 
-                            value="@Model.Resources[i]" 
-                            class="form-control mb-1" 
-                            placeholder="Descripción del recurso" 
-                            maxlength="100" />
-                        <button type="button" class="btn btn-danger btn-sm" onclick="removeResource(@i)">Delete</button>
-                    </div>
-                }
-            }
-        </div>
-        <button type="button" class="btn btn-primary btn-sm mb-4" onclick="addResource()">Add resource</button>
-    </div>
-
-    <div class="d-flex justify-content-between mt-4">
-        <button type="submit" class="btn btn-primary">Save</button>
-        <button type="button" class="btn btn-outline-secondary" onclick="goBack()">← Volver atrás</button>
-    </div>
-</form>
-<script>
-    async function checkOngAccess() {
-        const token = localStorage.getItem("jwt");
-        if (!token) {
-            window.location.href = "/AuthView/Login";
-            return;
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>@ViewData["Title"]</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f7f8fa;
+            min-height: 100vh;
+            padding-top: 80px;
+            font-family: 'Segoe UI', sans-serif;
         }
 
-        const res = await fetch("http://localhost:5054/api/auth/profile", {
-            headers: { "Authorization": "Bearer " + token }
-        });
-
-        if (!res.ok) {
-            localStorage.removeItem("jwt");
-            window.location.href = "/AuthView/Login";
-            return;
+        .navbar {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 1000;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
         }
 
-        const profile = await res.json();
-
- 
-        if (profile.isOfferingOng) {
-            window.location.href = "/AuthView/ProjectList"; 
+        .container {
+            max-width: 700px;
+            background: #fff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
         }
-    }
 
- 
-    checkOngAccess(); 
-</script>
+        .resource-item {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
 
+        .resource-item input {
+            flex: 1;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-light bg-light d-flex justify-content-between px-4 py-2">
+        <span class="navbar-brand mb-0 h5">Project Planning - Crear Proyecto</span>
+        <button class="btn btn-outline-danger btn-sm" onclick="logout()">Cerrar sesión</button>
+    </nav>
 
+    <div class="container mt-4">
+        <h2>📢 Crear Proyecto</h2>
 
-@section Scripts {
-    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="alert alert-success">
+                @TempData["SuccessMessage"]
+            </div>
+        }
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="alert alert-danger">
+                @TempData["ErrorMessage"]
+            </div>
+        }
 
+        <form asp-action="Create" method="post">
+            <div class="form-group mb-3">
+                <label asp-for="Name" class="form-label">Nombre del Proyecto</label>
+                <input asp-for="Name" class="form-control" maxlength="30" required />
+                <span asp-validation-for="Name" class="text-danger"></span>
+            </div>
+
+            <div class="form-group mb-3">
+                <label asp-for="StartDate" class="form-label">Fecha de Inicio</label>
+                <input asp-for="StartDate" type="date" class="form-control" required />
+                <span asp-validation-for="StartDate" class="text-danger"></span>
+            </div>
+
+            <div class="form-group mb-3">
+                <label asp-for="EndDate" class="form-label">Fecha de Fin</label>
+                <input asp-for="EndDate" type="date" class="form-control" required />
+                <span asp-validation-for="EndDate" class="text-danger"></span>
+            </div>
+
+            <div class="form-group mb-3">
+                <label class="form-label">Recursos Necesarios</label>
+                <div id="resource-list">
+                    @if (Model?.Resources != null && Model.Resources.Count > 0) {
+                        @for (int i = 0; i < Model.Resources.Count; i++)
+                        {
+                            <div class="resource-item" id="resource-@i">
+                                <input type="text" 
+                                    name="Resources[@i]" 
+                                    value="@Model.Resources[i]" 
+                                    class="form-control" 
+                                    placeholder="Descripción del recurso" 
+                                    maxlength="100" />
+                                <button type="button" class="btn btn-danger btn-sm" onclick="removeResource(@i)">Eliminar</button>
+                            </div>
+                        }
+                    }
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm mt-2" onclick="addResource()">+ Agregar Recurso</button>
+            </div>
+
+            <div class="d-flex justify-content-between mt-4">
+                <button type="submit" class="btn btn-primary">💾 Guardar Proyecto</button>
+                <button type="button" class="btn btn-outline-secondary" onclick="goBack()">← Volver</button>
+            </div>
+        </form>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-    let resourceIndex = @(Model?.Resources?.Count ?? 0);
+        // Verificar sesión de Bonita
+        function checkBonitaSession() {
+            const sessionId = localStorage.getItem("bonitaSessionId");
+            const apiToken = localStorage.getItem("bonitaApiToken");
+            const rolesJson = localStorage.getItem("bonitaRoles");
 
-    function addResource() {
-        const container = document.getElementById('resource-list');
+            console.log("Verificando sesión Bonita en Create...");
+            console.log("SessionId:", sessionId ? "✓" : "✗");
+            console.log("ApiToken:", apiToken ? "✓" : "✗");
 
-        const div = document.createElement('div');
-        div.classList.add('resource-item', 'mb-1');
-        div.id = `resource-${resourceIndex}`;
+            // Si no hay sesión, redirigir a login
+            if (!sessionId || !apiToken) {
+                console.warn("No hay sesión, redirigiendo a login...");
+                window.location.href = "/AuthView/Login";
+                return false;
+            }
 
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.name = `Resources[${resourceIndex}]`;
-        input.placeholder = 'Descripción del recurso';
-        input.classList.add('form-control', 'mb-1');
-        input.maxLength = 100; 
+            const roles = JSON.parse(rolesJson || "[]");
+            console.log("Roles:", roles);
 
-        const removeBtn = document.createElement('button');
-        removeBtn.type = 'button';
-        removeBtn.classList.add('btn', 'btn-danger', 'btn-sm', 'mb-1');
-        removeBtn.innerText = 'Eliminar';
+            // Verificar que tiene rol de offering projects
+            const hasOfferingRole = roles.some(r => 
+                String(r).toLowerCase().includes("offering_projects")
+            );
 
-        const currentIndex = resourceIndex;
-        removeBtn.onclick = () => removeResource(currentIndex);
+            if (!hasOfferingRole) {
+                console.warn("Usuario NO tiene permiso para crear proyectos, redirigiendo...");
+                window.location.href = "/AuthView/ProjectList";
+                return false;
+            }
 
-        div.appendChild(input);
-        div.appendChild(removeBtn);
-        container.appendChild(div);
-
-        resourceIndex++;
-    }
-
-    function removeResource(index) {
-        const element = document.getElementById(`resource-${index}`);
-        if (element) element.remove();
-    }
-
-    
-    document.querySelector('form').addEventListener('submit', function(event) {
-        const resources = document.querySelectorAll('#resource-list input[type="text"]');
-        if (resources.length === 0) {
-            alert('At least one resource is required.');
-            event.preventDefault();
-            return;
+            return true;
         }
 
-        for (let i = 0; i < resources.length; i++) {
-            if (!resources[i].value.trim()) {
-                alert(`Resource numeber ${i + 1} cannot be empty.`);
+        function logout() {
+            console.log("Cerrando sesión...");
+            localStorage.clear();
+            window.location.href = "/AuthView/Login";
+        }
+
+        function goBack() {
+            window.location.href = "/AuthView/OngMenu";
+        }
+
+        // Verificar sesión al cargar la página
+        if (!checkBonitaSession()) {
+            // Si falla la verificación, ya redirigió
+        }
+
+        // Gestión de recursos dinámicos
+        let resourceIndex = @(Model?.Resources?.Count ?? 0);
+
+        function addResource() {
+            const container = document.getElementById('resource-list');
+
+            const div = document.createElement('div');
+            div.classList.add('resource-item');
+            div.id = `resource-${resourceIndex}`;
+
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.name = `Resources[${resourceIndex}]`;
+            input.placeholder = 'Descripción del recurso';
+            input.classList.add('form-control');
+            input.maxLength = 100;
+            input.required = true;
+
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.classList.add('btn', 'btn-danger', 'btn-sm');
+            removeBtn.innerText = 'Eliminar';
+
+            const currentIndex = resourceIndex;
+            removeBtn.onclick = () => removeResource(currentIndex);
+
+            div.appendChild(input);
+            div.appendChild(removeBtn);
+            container.appendChild(div);
+
+            resourceIndex++;
+        }
+
+        function removeResource(index) {
+            const element = document.getElementById(`resource-${index}`);
+            if (element) element.remove();
+        }
+
+        // Validación del formulario
+        document.querySelector('form').addEventListener('submit', function(event) {
+            const resources = document.querySelectorAll('#resource-list input[type="text"]');
+            
+            if (resources.length === 0) {
+                alert('⚠️ Debes agregar al menos un recurso.');
                 event.preventDefault();
                 return;
             }
-        }
-    });
+
+            for (let i = 0; i < resources.length; i++) {
+                if (!resources[i].value.trim()) {
+                    alert(`⚠️ El recurso número ${i + 1} no puede estar vacío.`);
+                    event.preventDefault();
+                    return;
+                }
+            }
+        });
     </script>
-}
+</body>
+</html>
