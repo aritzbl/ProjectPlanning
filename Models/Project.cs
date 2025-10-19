@@ -20,7 +20,7 @@ namespace ProjectPlanning.Web.Models
         public DateTime EndDate { get; set; }
 
         [Required(ErrorMessage = "Resource is required")]
-        public List<String> Resources { get; set; } = new List<String>();
+        public List<Resource> Resources { get; set; } = new();
 
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {

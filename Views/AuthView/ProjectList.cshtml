@@ -155,15 +155,27 @@
                 const project = await res.json();
 
                 document.getElementById("projectModalLabel").textContent = project.name;
+
+                let resourcesHtml = '<ul>';
+                if (project.resources && project.resources.length > 0) {
+                    project.resources.forEach((r, index) => {
+                        resourcesHtml += `
+                            <li id="resource-${r.id}">
+                                ${r.name} - <strong>${r.state}</strong>
+                                ${r.state === 'pending' ? `<button class="btn btn-sm btn-success ms-2" onclick="offerResource(${project.id}, ${r.id})">Offer</button>` : ''}
+                            </li>
+                        `;
+                    });
+                } else {
+                    resourcesHtml += '<li class="text-muted">Sin recursos definidos</li>';
+                }
+                resourcesHtml += '</ul>';
+
                 document.getElementById("projectModalBody").innerHTML = `
                     <p><strong>Inicio:</strong> ${new Date(project.startDate).toLocaleDateString('es-ES')}</p>
                     <p><strong>Fin:</strong> ${new Date(project.endDate).toLocaleDateString('es-ES')}</p>
                     <p><strong>Recursos:</strong></p>
-                    <ul>
-                        ${project.resources && project.resources.length > 0 
-                            ? project.resources.map(r => `<li>${r}</li>`).join('') 
-                            : '<li class="text-muted">Sin recursos definidos</li>'}
-                    </ul>
+                    ${resourcesHtml}
                 `;
 
                 const modal = new bootstrap.Modal(document.getElementById('projectModal'));
@@ -181,6 +193,33 @@
 
         if (checkBonitaSession()) {
             loadProjects();
+        }
+
+        // Función para ofrecer un recurso
+        async function offerResource(projectId, resourceId) {
+            try {
+                const res = await fetch(`/api/projects/${projectId}/resources/${resourceId}/offer`, {
+                    method: 'PATCH'
+                });
+
+                if (!res.ok) {
+                    alert("⚠️ No se pudo ofrecer el recurso.");
+                    return;
+                }
+
+                // Cambiamos el estado
+                const li = document.getElementById(`resource-${resourceId}`);
+                if (li) {
+                    li.querySelector('strong').textContent = 'offer';
+                    // Eliminamos el botón porque ya fue ofrecido
+                    const btn = li.querySelector('button');
+                    if (btn) btn.remove();
+                }
+
+            } catch (error) {
+                console.error("Error ofreciendo recurso:", error);
+                alert("⚠️ Error al ofrecer recurso.");
+            }
         }
     </script>
 </body>

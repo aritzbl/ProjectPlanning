@@ -95,8 +95,8 @@
                         {
                             <div class="resource-item" id="resource-@i">
                                 <input type="text" 
-                                    name="Resources[@i]" 
-                                    value="@Model.Resources[i]" 
+                                    name="Resources[@i].Name" 
+                                    value="@Model.Resources[i].Name" 
                                     class="form-control" 
                                     placeholder="Descripción del recurso" 
                                     maxlength="100" />
@@ -178,7 +178,7 @@
 
             const input = document.createElement('input');
             input.type = 'text';
-            input.name = `Resources[${resourceIndex}]`;
+            input.name = `Resources[${resourceIndex}].Name`;
             input.placeholder = 'Descripción del recurso';
             input.classList.add('form-control');
             input.maxLength = 100;

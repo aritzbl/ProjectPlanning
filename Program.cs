@@ -14,7 +14,9 @@ builder.Services.AddHttpClient<IBonitaApiService, BonitaApiService>();
 
 // --- Base de datos ---
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"))
+    .EnableSensitiveDataLogging()  // importante para ver valores de binding
+    .LogTo(Console.WriteLine, LogLevel.Information));
 
 // --- Configuración Bonita ---
 builder.Services.Configure<BonitaConfig>(

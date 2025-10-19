@@ -19,7 +19,7 @@ namespace ProjectPlanning.Controllers
             _context = context;
         }
 
-        // ---------- VISTA CREATE ----------
+        // VISTA CREATE
         public async Task<IActionResult> Create()
         {
             var isBonitaAvailable = await _bonitaService.IsBonitaAvailableAsync();
@@ -31,7 +31,7 @@ namespace ProjectPlanning.Controllers
             return View(new Project());
         }
 
-        // ---------- POST CREATE ----------
+        // POST CREATE
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(Project project)
@@ -40,14 +40,24 @@ namespace ProjectPlanning.Controllers
             {
                 try
                 {
-                    // convertir fechas a UTC para postgres
+                    // Convertir fechas a UTC para postgres
                     project.StartDate = DateTime.SpecifyKind(project.StartDate, DateTimeKind.Utc);
                     project.EndDate = DateTime.SpecifyKind(project.EndDate, DateTimeKind.Utc);
+
+                    if (project.Resources != null)
+                    {
+                        foreach (var resource in project.Resources)
+                        {
+                            resource.Project = project;
+                        }
+                    }
 
                     _context.Projects.Add(project);
                     await _context.SaveChangesAsync();
 
-                    // iniciar proceso en Bonita
+                    _logger.LogInformation("Project saved to DB with Id: {ProjectId}", project.Id);
+
+                    // Iniciar proceso en Bonita
                     var isBonitaAvailable = await _bonitaService.IsBonitaAvailableAsync();
                     if (!isBonitaAvailable)
                     {
@@ -99,6 +109,33 @@ namespace ProjectPlanning.Controllers
                 return NotFound(new { message = "Project not found." });
 
             return Ok(project);
+        }
+
+        [HttpPatch("api/projects/{projectId}/resources/{resourceId}/offer")]
+        public async Task<IActionResult> OfferResource(int projectId, int resourceId)
+        {
+            try
+            {
+                // Buscamos el recurso dentro del proyecto
+                var resource = await _context.Resources
+                    .FirstOrDefaultAsync(r => r.Id == resourceId && r.ProjectId == projectId);
+
+                if (resource == null)
+                    return NotFound(new { message = "Resource not found" });
+
+                // Cambiamos el estado a "offer"
+                resource.State = "offer";
+
+                // Guardamos cambios
+                await _context.SaveChangesAsync();
+
+                return Ok(new { message = "Resource offered successfully" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error offering resource {ResourceId} in project {ProjectId}", resourceId, projectId);
+                return StatusCode(500, new { message = "Internal server error" });
+            }
         }
     }
 }
