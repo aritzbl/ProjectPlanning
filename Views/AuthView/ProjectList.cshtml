@@ -156,18 +156,39 @@
 
                 document.getElementById("projectModalLabel").textContent = project.name;
 
-                let resourcesHtml = '<ul>';
+                let resourcesHtml = '';
                 if (project.resources && project.resources.length > 0) {
+                    resourcesHtml += `
+                        <div class="list-group mt-2">
+                    `;
+
                     project.resources.forEach((r, index) => {
                         resourcesHtml += `
-                            <li id="resource-${r.id}">
-                                ${r.name} - <strong>${r.state}</strong>
-                                ${r.state === 'pending' ? `<button class="btn btn-sm btn-success ms-2" onclick="offerResource(${project.id}, ${r.id})">Offer</button>` : ''}
-                            </li>
+                            <div id="resource-${r.id}" 
+                                class="list-group-item d-flex justify-content-between align-items-center border-0 border-bottom py-2">
+                                <div>
+                                    <span class="fw-semibold">${r.name}</span>
+                                    <span class="badge ${r.state === 'pending' ? 'bg-warning text-dark' 
+                                        : r.state === 'offer' ? 'bg-info text-dark' 
+                                        : 'bg-success'} ms-2">${r.state}</span>
+                                </div>
+                                ${r.state === 'pending' 
+                                    ? `<button class="btn btn-sm btn-success ms-2" 
+                                            onclick="offerResource(${project.id}, ${r.id})">
+                                            Offer
+                                    </button>` 
+                                    : ''}
+                            </div>
                         `;
                     });
+
+                    resourcesHtml += `
+                        </div>
+                    `;
                 } else {
-                    resourcesHtml += '<li class="text-muted">Sin recursos definidos</li>';
+                    resourcesHtml += `
+                        <p class="text-muted fst-italic mt-2">Sin recursos definidos</p>
+                    `;
                 }
                 resourcesHtml += '</ul>';
 

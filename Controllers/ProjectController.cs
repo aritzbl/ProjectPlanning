@@ -104,12 +104,15 @@ namespace ProjectPlanning.Controllers
         [Route("api/projects/{id}")]
         public async Task<IActionResult> GetProjectById(int id)
         {
-            var project = await _context.Projects.FirstOrDefaultAsync(p => p.Id == id);
-            if (project == null)
-                return NotFound(new { message = "Project not found." });
+            var project = await _context.Projects
+                .Include(p => p.Resources)
+                .FirstOrDefaultAsync(p => p.Id == id);
 
-            return Ok(project);
-        }
+                    if (project == null)
+                        return NotFound(new { message = "Project not found." });
+
+                    return Ok(project);
+                }
 
         [HttpPatch("api/projects/{projectId}/resources/{resourceId}/offer")]
         public async Task<IActionResult> OfferResource(int projectId, int resourceId)
