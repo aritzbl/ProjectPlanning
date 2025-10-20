@@ -14,7 +14,7 @@ namespace ProjectPlanning.DTOs
 
     public class BonitaProcessInstanceResponse
     {
-        public string Id { get; set; } = string.Empty;
+        public long CaseId { get; set; } 
     }
 
     public class BonitaProcessDefinition

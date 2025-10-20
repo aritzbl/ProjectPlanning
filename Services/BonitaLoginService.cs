@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Headers;
-// using Microsoft.AspNetCore.Mvc; // <- remover, no se usa en servicios
 using System.Text.RegularExpressions;
 using System.Text.Json;
 
@@ -78,7 +77,6 @@ namespace ProjectPlanning.Web.Services
 
         private async Task<(string userId, List<string> roles)> GetUserProfileAsync(string sessionId, string apiToken, string username)
         {
-            // 1) Usuario por username
             var userReq = new HttpRequestMessage(HttpMethod.Get, $"API/identity/user?p=0&c=1&f=userName={Uri.EscapeDataString(username)}");
             userReq.Headers.Add("Cookie", $"JSESSIONID={sessionId}");
             userReq.Headers.Add("X-Bonita-API-Token", apiToken);
@@ -106,7 +104,6 @@ namespace ProjectPlanning.Web.Services
                 return ("", new List<string>());
             }
 
-            // 2) Memberships con expansión del rol (d=role_id)
             var memReq = new HttpRequestMessage(HttpMethod.Get, $"API/identity/membership?p=0&c=100&f=user_id={Uri.EscapeDataString(userId)}&d=role_id");
             memReq.Headers.Add("Cookie", $"JSESSIONID={sessionId}");
             memReq.Headers.Add("X-Bonita-API-Token", apiToken);
