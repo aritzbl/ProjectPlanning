@@ -30,7 +30,7 @@ namespace ProjectPlanning.Web.Services
         {
             var claims = new[]
             {
-                new Claim(ClaimTypes.Email, user.Email), // 👈 este es el que lee User.FindFirst(ClaimTypes.Email)
+                new Claim(ClaimTypes.Email, user.Email), // este es el que lee User.FindFirst(ClaimTypes.Email)
                 new Claim("isOfferingOng", user.IsOfferingOng.ToString().ToLower())
             };
 
