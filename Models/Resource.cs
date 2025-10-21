@@ -23,5 +23,6 @@ namespace ProjectPlanning.Web.Models
 
         // Pending, offer, accepted
         public string? State { get; set; } = "pending";
+        public string? ContactEmail { get; set; }
     }
 }

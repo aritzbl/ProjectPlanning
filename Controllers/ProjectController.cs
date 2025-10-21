@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using ProjectPlanning.Web.Models;
 using ProjectPlanning.Web.Services;
 using ProjectPlanning.Web.Data;
+using System.Text.Json;
 
 namespace ProjectPlanning.Controllers
 {
@@ -82,6 +83,7 @@ namespace ProjectPlanning.Controllers
             return View(project);
         }
 
+        // GET: todos los proyectos
         [HttpGet]
         [Route("api/projects")]
         public async Task<IActionResult> GetAllProjects()
@@ -100,6 +102,7 @@ namespace ProjectPlanning.Controllers
             return Ok(projects);
         }
 
+        // GET: detalle de un proyecto
         [HttpGet]
         [Route("api/projects/{id}")]
         public async Task<IActionResult> GetProjectById(int id)
@@ -108,36 +111,51 @@ namespace ProjectPlanning.Controllers
                 .Include(p => p.Resources)
                 .FirstOrDefaultAsync(p => p.Id == id);
 
-                    if (project == null)
-                        return NotFound(new { message = "Project not found." });
+            if (project == null)
+                return NotFound(new { message = "Project not found." });
 
-                    return Ok(project);
-                }
+            return Ok(project);
+        }
 
+        // PATCH: ofrecer recurso (aceptar con email)
         [HttpPatch("api/projects/{projectId}/resources/{resourceId}/offer")]
-        public async Task<IActionResult> OfferResource(int projectId, int resourceId)
+        public async Task<IActionResult> OfferResource(int projectId, int resourceId, [FromBody] JsonElement body)
         {
             try
             {
-                // Buscamos el recurso dentro del proyecto
+                if (!body.TryGetProperty("contactEmail", out var emailElement))
+                    return BadRequest(new { message = "El campo 'contactEmail' es obligatorio." });
+
+                var contactEmail = emailElement.GetString()?.Trim();
+                if (string.IsNullOrEmpty(contactEmail) || !contactEmail.Contains("@"))
+                    return BadRequest(new { message = "Debe ingresar un email válido." });
+
                 var resource = await _context.Resources
                     .FirstOrDefaultAsync(r => r.Id == resourceId && r.ProjectId == projectId);
 
                 if (resource == null)
-                    return NotFound(new { message = "Resource not found" });
+                    return NotFound(new { message = "Recurso no encontrado." });
 
-                // Cambiamos el estado a "offer"
-                resource.State = "offer";
+                resource.State = "accepted";
+                resource.ContactEmail = contactEmail;
 
-                // Guardamos cambios
                 await _context.SaveChangesAsync();
 
-                return Ok(new { message = "Resource offered successfully" });
+                _logger.LogInformation("✅ Recurso {ResourceId} del proyecto {ProjectId} ofrecido por {Email}",
+                    resourceId, projectId, contactEmail);
+
+                return Ok(new
+                {
+                    message = "Recurso ofrecido correctamente.",
+                    resourceId,
+                    newState = resource.State,
+                    contactEmail
+                });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error offering resource {ResourceId} in project {ProjectId}", resourceId, projectId);
-                return StatusCode(500, new { message = "Internal server error" });
+                _logger.LogError(ex, "❌ Error al ofrecer recurso {ResourceId} en proyecto {ProjectId}", resourceId, projectId);
+                return StatusCode(500, new { message = "Error interno del servidor." });
             }
         }
     }
