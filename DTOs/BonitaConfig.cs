@@ -5,8 +5,8 @@ namespace ProjectPlanning.DTOs
         public string BaseUrl { get; set; } = string.Empty;
         public string Username { get; set; } = string.Empty;
         public string Password { get; set; } = string.Empty;
-
-        public string? ProcessDefinitionId { get; set; }
+        public string ProcessDefinitionId { get; set; } = string.Empty;
+        public string UserId { get; set; } = string.Empty;
     }
 }
 

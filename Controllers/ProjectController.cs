@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using ProjectPlanning.Web.Models;
 using ProjectPlanning.Web.Services;
 using ProjectPlanning.Web.Data;
+using System.Text.Json;
 
 namespace ProjectPlanning.Controllers
 {
@@ -19,7 +20,7 @@ namespace ProjectPlanning.Controllers
             _context = context;
         }
 
-        // ---------- VISTA CREATE ----------
+        // VISTA CREATE
         public async Task<IActionResult> Create()
         {
             var isBonitaAvailable = await _bonitaService.IsBonitaAvailableAsync();
@@ -31,7 +32,7 @@ namespace ProjectPlanning.Controllers
             return View(new Project());
         }
 
-        // ---------- POST CREATE ----------
+        // POST CREATE
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(Project project)
@@ -40,14 +41,24 @@ namespace ProjectPlanning.Controllers
             {
                 try
                 {
-                    // convertir fechas a UTC para postgres
+                    // Convertir fechas a UTC para postgres
                     project.StartDate = DateTime.SpecifyKind(project.StartDate, DateTimeKind.Utc);
                     project.EndDate = DateTime.SpecifyKind(project.EndDate, DateTimeKind.Utc);
+
+                    if (project.Resources != null)
+                    {
+                        foreach (var resource in project.Resources)
+                        {
+                            resource.Project = project;
+                        }
+                    }
 
                     _context.Projects.Add(project);
                     await _context.SaveChangesAsync();
 
-                    // iniciar proceso en Bonita
+                    _logger.LogInformation("Project saved to DB with Id: {ProjectId}", project.Id);
+
+                    // Iniciar proceso en Bonita
                     var isBonitaAvailable = await _bonitaService.IsBonitaAvailableAsync();
                     if (!isBonitaAvailable)
                     {
@@ -72,9 +83,9 @@ namespace ProjectPlanning.Controllers
             return View(project);
         }
 
-    
-        [HttpGet("/api/projects")]
-        [Microsoft.AspNetCore.Authorization.Authorize]
+        // GET: todos los proyectos
+        [HttpGet]
+        [Route("api/projects")]
         public async Task<IActionResult> GetAllProjects()
         {
             var projects = await _context.Projects
@@ -91,15 +102,61 @@ namespace ProjectPlanning.Controllers
             return Ok(projects);
         }
 
-        [HttpGet("/api/projects/{id}")]
-        [Microsoft.AspNetCore.Authorization.Authorize]
+        // GET: detalle de un proyecto
+        [HttpGet]
+        [Route("api/projects/{id}")]
         public async Task<IActionResult> GetProjectById(int id)
         {
-            var project = await _context.Projects.FirstOrDefaultAsync(p => p.Id == id);
+            var project = await _context.Projects
+                .Include(p => p.Resources)
+                .FirstOrDefaultAsync(p => p.Id == id);
+
             if (project == null)
                 return NotFound(new { message = "Project not found." });
 
             return Ok(project);
+        }
+
+        // PATCH: ofrecer recurso (aceptar con email)
+        [HttpPatch("api/projects/{projectId}/resources/{resourceId}/offer")]
+        public async Task<IActionResult> OfferResource(int projectId, int resourceId, [FromBody] JsonElement body)
+        {
+            try
+            {
+                if (!body.TryGetProperty("contactEmail", out var emailElement))
+                    return BadRequest(new { message = "El campo 'contactEmail' es obligatorio." });
+
+                var contactEmail = emailElement.GetString()?.Trim();
+                if (string.IsNullOrEmpty(contactEmail) || !contactEmail.Contains("@"))
+                    return BadRequest(new { message = "Debe ingresar un email válido." });
+
+                var resource = await _context.Resources
+                    .FirstOrDefaultAsync(r => r.Id == resourceId && r.ProjectId == projectId);
+
+                if (resource == null)
+                    return NotFound(new { message = "Recurso no encontrado." });
+
+                resource.State = "accepted";
+                resource.ContactEmail = contactEmail;
+
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation("✅ Recurso {ResourceId} del proyecto {ProjectId} ofrecido por {Email}",
+                    resourceId, projectId, contactEmail);
+
+                return Ok(new
+                {
+                    message = "Recurso ofrecido correctamente.",
+                    resourceId,
+                    newState = resource.State,
+                    contactEmail
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ Error al ofrecer recurso {ResourceId} en proyecto {ProjectId}", resourceId, projectId);
+                return StatusCode(500, new { message = "Error interno del servidor." });
+            }
         }
     }
 }

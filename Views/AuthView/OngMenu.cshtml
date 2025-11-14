@@ -71,6 +71,14 @@
             color: #777;
             font-size: 0.9rem;
         }
+
+        .user-info {
+            background: #e3f2fd;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 0.95rem;
+        }
     </style>
 </head>
 <body>
@@ -80,50 +88,74 @@
     </nav>
 
     <div class="card-menu mt-5">
-        <h2>Menu GNO</h2>
+        <div class="user-info">
+            <strong>👤 Usuario:</strong> <span id="username"></span><br>
+            <strong>🏢 Rol:</strong> ONG que ofrece proyectos
+        </div>
+
+        <h2>Menú ONG</h2>
 
         <button class="btn btn-primary menu-btn" onclick="window.location.href='/Project/Create'">
-            <span class="icon">📢</span> Publish a project
+            <span class="icon">📢</span> Publicar un proyecto
         </button>
 
-        <button class="btn btn-outline-primary menu-btn" onclick="window.location.href='/AuthView/ProjectList'">
-            <span class="icon">📋</span> View published projects
+        <button class="btn btn-outline-primary menu-btn" onclick="viewMyProjects()">
+            <span class="icon">📋</span> Ver mis proyectos
         </button>
 
+        <p class="footer-note">Gestiona tus proyectos desde este panel</p>
     </div>
 
     <script>
-        
-        async function checkOngAccess() {
-            const token = localStorage.getItem("jwt");
-            if (!token) {
+        function checkBonitaAccess() {
+            const sessionId = localStorage.getItem("bonitaSessionId");
+            const apiToken = localStorage.getItem("bonitaApiToken");
+            const rolesJson = localStorage.getItem("bonitaRoles");
+            const username = localStorage.getItem("bonitaUsername");
+
+            console.log("Verificando acceso a OngMenu...");
+            console.log("SessionId:", sessionId ? "✓" : "✗");
+            console.log("ApiToken:", apiToken ? "✓" : "✗");
+
+            // Si no hay sesión, redirigir a login
+            if (!sessionId || !apiToken) {
+                console.warn("No hay sesión, redirigiendo a login...");
                 window.location.href = "/AuthView/Login";
                 return;
             }
 
-            const res = await fetch("http://localhost:5054/api/auth/profile", {
-                headers: { "Authorization": "Bearer " + token }
-            });
+            // Mostrar nombre de usuario
+            document.getElementById("username").textContent = username || "N/A";
 
-            if (!res.ok) {
-                localStorage.removeItem("jwt");
-                window.location.href = "/AuthView/Login";
-                return;
-            }
+            const roles = JSON.parse(rolesJson || "[]");
+            console.log("Roles:", roles);
 
-            const profile = await res.json();
-            if (profile.isOfferingOng) {
-                window.location.href = "/AuthView/ProjectList"; 
+            // Verificar que tiene rol de offering projects
+            const hasOfferingRole = roles.some(r => 
+                String(r).toLowerCase().includes("offering_projects")
+            );
+
+            if (!hasOfferingRole) {
+                console.warn("Usuario NO tiene rol de offering projects, redirigiendo a ProjectList...");
+                window.location.href = "/AuthView/ProjectList";
             }
         }
 
-        
-        document.getElementById("logoutBtn").addEventListener("click", () => {
-            localStorage.removeItem("jwt");
-            window.location.href = "/AuthView/Login";
-        });
+        function viewMyProjects() {
+            window.location.href = "/AuthView/ProjectList";
+        }
 
-        checkOngAccess();
+        function logout() {
+            console.log("Cerrando sesión...");
+            localStorage.clear();
+            window.location.href = "/AuthView/Login";
+        }
+
+        // Event listeners
+        document.getElementById("logoutBtn").addEventListener("click", logout);
+
+        // Verificar acceso al cargar
+        checkBonitaAccess();
     </script>
 </body>
 </html>
