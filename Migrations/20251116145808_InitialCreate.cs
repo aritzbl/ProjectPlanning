@@ -7,7 +7,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace projectplanning.Migrations
 {
     /// <inheritdoc />
-    public partial class UpdateProjectModel : Migration
+    public partial class InitialCreate : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -20,7 +20,8 @@ namespace projectplanning.Migrations
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     Name = table.Column<string>(type: "text", nullable: false),
                     StartDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    EndDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                    EndDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    CreatorEmail = table.Column<string>(type: "text", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -35,7 +36,8 @@ namespace projectplanning.Migrations
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     ProjectId = table.Column<int>(type: "integer", nullable: false),
                     Name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
-                    State = table.Column<string>(type: "text", nullable: true)
+                    State = table.Column<string>(type: "text", nullable: true),
+                    ContactEmail = table.Column<string>(type: "text", nullable: true)
                 },
                 constraints: table =>
                 {
