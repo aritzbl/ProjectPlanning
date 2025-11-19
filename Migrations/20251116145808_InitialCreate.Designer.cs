@@ -12,8 +12,8 @@ using ProjectPlanning.Web.Data;
 namespace projectplanning.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20251020190637_AddContactEmailToResource")]
-    partial class AddContactEmailToResource
+    [Migration("20251116145808_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -32,6 +32,10 @@ namespace projectplanning.Migrations
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("CreatorEmail")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("EndDate")
                         .HasColumnType("timestamp with time zone");

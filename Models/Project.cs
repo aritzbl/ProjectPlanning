@@ -22,6 +22,10 @@ namespace ProjectPlanning.Web.Models
         [Required(ErrorMessage = "Resource is required")]
         public List<Resource> Resources { get; set; } = new();
 
+        [Required(ErrorMessage = "Creator email is required")]
+        [EmailAddress(ErrorMessage = "Invalid email format")]
+        public string? CreatorEmail { get; set; }
+
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {
             var today = DateTime.Today;

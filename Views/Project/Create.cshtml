@@ -70,6 +70,12 @@
 
         <form asp-action="Create" method="post">
             <div class="form-group mb-3">
+                <label asp-for="CreatorEmail" class="form-label">Email del responsable del proyecto</label>
+                <input asp-for="CreatorEmail" class="form-control" maxlength="100" required />
+                <span asp-validation-for="CreatorEmail" class="text-danger"></span>
+            </div>
+
+            <div class="form-group mb-3">
                 <label asp-for="Name" class="form-label">Nombre del Proyecto</label>
                 <input asp-for="Name" class="form-control" maxlength="30" required />
                 <span asp-validation-for="Name" class="text-danger"></span>

@@ -11,6 +11,7 @@ namespace ProjectPlanning.Web.Services
         Task<bool> IsBonitaAvailableAsync();
         Task<List<BonitaProcess>> GetAvailableProcessesAsync();
         Task CompleteFirstTaskAsync(string caseId);
+        Task StartMonitoringProcessesForActiveProjectsAsync(List<Project> activeProjects);
     }
 
     public class BonitaApiService : IBonitaApiService
@@ -54,7 +55,7 @@ namespace ProjectPlanning.Web.Services
             try
             {
                 await AuthenticateAsync();
-                var processId = await GetProcessDefinitionIdAsync();
+                var processId = await GetProcessDefinitionIdAsync("Notificar ONGs");
 
                 var processInstance = CreateProcessInstance(project, processId);
                 var json = JsonSerializer.Serialize(processInstance, new JsonSerializerOptions
@@ -157,9 +158,8 @@ namespace ProjectPlanning.Web.Services
             }
         }
 
-        public async Task<string> GetProcessDefinitionIdAsync()
+        public async Task<string> GetProcessDefinitionIdAsync(string processName)
         {
-            var processName = _config.ProcessDefinitionId;
             await AuthenticateAsync();
 
             var response = await _httpClient.GetAsync($"API/bpm/process?p=0&c=10&f=name={processName}");
@@ -280,6 +280,59 @@ namespace ProjectPlanning.Web.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "❌ Error al intentar completar la primera tarea automáticamente (CaseId: {CaseId})", caseId);
+                throw;
+            }
+        }
+
+        public async Task StartMonitoringProcessesForActiveProjectsAsync(List<Project> activeProjects)
+        {
+            if (activeProjects == null || activeProjects.Count == 0)
+            {
+                _logger.LogInformation("No hay proyectos activos para iniciar el proceso de monitoreo.");
+                return;
+            }
+
+            try
+            {
+                await AuthenticateAsync();
+
+                // ID del proceso Monitoreo y Control
+                var processId = await GetProcessDefinitionIdAsync("Monitoreo"); 
+
+                foreach (var project in activeProjects)
+                {
+                    var processInstance = new BonitaProcessInstance
+                    {
+                        ProcessDefinitionId = processId,
+                        Variables = new List<BonitaVariable>
+                        {
+                            new() { Name = "creatorEmail", Value = project.CreatorEmail },
+                            new() { Name = "projectId", Value = project.Id }
+                        }
+                    };
+
+                    var json = JsonSerializer.Serialize(processInstance, new JsonSerializerOptions
+                    {
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                    });
+
+                    var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                    var response = await _httpClient.PostAsync($"API/bpm/process/{processId}/instantiation", content);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        _logger.LogInformation("✅ Proceso de monitoreo iniciado para proyecto {ProjectId} ({ProjectName})", project.Id, project.Name);
+                    }
+                    else
+                    {
+                        var errorContent = await response.Content.ReadAsStringAsync();
+                        _logger.LogError("❌ Falló al iniciar proceso de monitoreo para proyecto {ProjectId}: {Error}", project.Id, errorContent);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "⚠️ Error iniciando procesos de monitoreo para proyectos activos.");
                 throw;
             }
         }

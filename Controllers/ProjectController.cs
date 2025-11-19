@@ -67,7 +67,7 @@ namespace ProjectPlanning.Controllers
                     }
 
                     var processInstanceId = await _bonitaService.StartProcessInstanceAsync(project);
-                    TempData["SuccessMessage"] = $"✅ Project created successfully! Process instance ID: {processInstanceId}";
+                    TempData["SuccessMessage"] = $"✅ Project created successfully!";
 
                     _logger.LogInformation("Project {ProjectName} created with process instance {ProcessId}", project.Name, processInstanceId);
 
@@ -103,7 +103,7 @@ namespace ProjectPlanning.Controllers
         }
 
         // GET: detalle de un proyecto
-        [HttpGet]
+        [HttpGet("{id}")]
         [Route("api/projects/{id}")]
         public async Task<IActionResult> GetProjectById(int id)
         {
@@ -114,7 +114,49 @@ namespace ProjectPlanning.Controllers
             if (project == null)
                 return NotFound(new { message = "Project not found." });
 
-            return Ok(project);
+            return Ok(new
+            {
+                id = project.Id,
+                name = project.Name,
+                startDate = project.StartDate,
+                endDate = project.EndDate,
+                creatorEmail = project.CreatorEmail,
+                resources = project.Resources.Select(r => new {
+                    id = r.Id,
+                    name = r.Name,
+                    state = r.State
+                })
+            });
+        }
+
+        // Endpoint: proyectos activos para Bonita (StartDate <= now && EndDate >= now)
+        [HttpGet]
+        [Route("api/projects/active")]
+        public async Task<IActionResult> GetActiveProjects()
+        {
+            var nowUtc = DateTime.UtcNow;
+
+            var activeProjects = await _context.Projects
+                .Where(p => p.StartDate <= nowUtc && p.EndDate >= nowUtc)
+                .OrderBy(p => p.StartDate)
+                .Select(p => new
+                {
+                    p.Id,
+                    p.Name,
+                    p.StartDate,
+                    p.EndDate,
+                    CreatorEmail = p.CreatorEmail,
+                    Resources = p.Resources.Select(r => new
+                    {
+                        r.Id,
+                        r.Name,
+                        r.State
+                    }).ToList()
+                })
+                .ToListAsync();
+
+            _logger.LogInformation("Returning {Count} active projects for Bonita", activeProjects.Count);
+            return Ok(activeProjects);
         }
 
         // PATCH: ofrecer recurso (aceptar con email)

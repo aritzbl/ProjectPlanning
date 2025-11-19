@@ -22,6 +22,14 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.Configure<BonitaConfig>(
     builder.Configuration.GetSection("Bonita"));
 
+
+// --- Proceso de Monitoreo y control de procesos ---
+builder.Services.AddHttpClient<ProjectService>();
+builder.Services.Configure<BonitaConfig>(
+    builder.Configuration.GetSection("Bonita"));
+builder.Services.AddScoped<ProjectService>();
+
+
 // --- Build app ---
 var app = builder.Build();
 
