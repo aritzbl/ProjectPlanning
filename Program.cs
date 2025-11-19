@@ -29,6 +29,9 @@ builder.Services.Configure<BonitaConfig>(
     builder.Configuration.GetSection("Bonita"));
 builder.Services.AddScoped<ProjectService>();
 
+// --- Servicio de Métricas ---
+builder.Services.AddScoped<MetricsService>();
+
 
 // --- Build app ---
 var app = builder.Build();

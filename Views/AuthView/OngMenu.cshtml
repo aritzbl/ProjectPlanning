@@ -103,6 +103,10 @@
             <span class="icon">📋</span> Ver mis proyectos
         </button>
 
+        <button class="btn btn-outline-success menu-btn" onclick="viewMetrics()">
+            <span class="icon">📊</span> Ver Métricas y Estadísticas
+        </button>
+
         <p class="footer-note">Gestiona tus proyectos desde este panel</p>
     </div>
 
@@ -143,6 +147,10 @@
 
         function viewMyProjects() {
             window.location.href = "/AuthView/ProjectList";
+        }
+
+        function viewMetrics() {
+            window.location.href = "/Metrics/Index";
         }
 
         function logout() {

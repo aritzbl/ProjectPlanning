@@ -26,6 +26,11 @@ namespace ProjectPlanning.Web.Models
         [EmailAddress(ErrorMessage = "Invalid email format")]
         public string? CreatorEmail { get; set; }
 
+        // Integración con Bonita
+        public string? ProcessInstanceId { get; set; } // ID del proceso en Bonita
+        public DateTime? ActualEndDate { get; set; } // Fecha real de finalización (cuando Bonita termina el proceso)
+        public string? ProcessStatus { get; set; } // Estado en Bonita: "active", "completed", "archived"
+
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {
             var today = DateTime.Today;
