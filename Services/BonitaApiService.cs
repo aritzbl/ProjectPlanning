@@ -68,7 +68,6 @@ namespace ProjectPlanning.Web.Services
 
                 _logger.LogInformation("DEBUG Bonita instantiation JSON: {Json}", json);
 
-
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
                 var response = await _httpClient.PostAsync($"API/bpm/process/{processId}/instantiation", content);
 
@@ -85,12 +84,17 @@ namespace ProjectPlanning.Web.Services
                     var caseId = processResponse?.CaseId.ToString() ?? "Unknown";
                     _logger.LogInformation("✅ Proceso iniciado correctamente con ID: {CaseId}", caseId);
 
-                    
                     if (caseId != "Unknown")
                     {
+                        // 1) Inicializamos variables de caso (idProyecto, projectName, pedidosJSON, etc.)
+                        await InitializeCaseVariablesForProjectAsync(caseId, project);
+
+                        // 2) Ejecutamos la tarea "Publicar proyecto"
                         await PublishProjectTaskAsync(caseId);
+
+                        // 3) Ejecutamos la siguiente tarea humana (donde está el conector CrearPedido_API)
+                        await CompleteNextTaskForCaseAsync(caseId);
                     }
-                    
 
                     return caseId;
                 }
@@ -108,6 +112,7 @@ namespace ProjectPlanning.Web.Services
                 throw;
             }
         }
+
 
 
         private async Task AuthenticateAsync()
@@ -447,7 +452,7 @@ namespace ProjectPlanning.Web.Services
 
                 _logger.LogInformation(
                     "🟢 Ejecutando tarea {DisplayName} (ID={TaskId}) para rootCaseId {CaseId}",
-                    displayName, taskId, caseId);
+                    displayName, taskId, caseId);  
 
                 // 3) Asignar la tarea al usuario configurado
                 var assignBody = new { assigned_id = _config.UserId };
@@ -476,6 +481,70 @@ namespace ProjectPlanning.Web.Services
                 return;
             }
         }
+
+        private async Task SetCaseVariableAsync(string caseId, string name, object value, string javaType)
+        {
+            await AuthenticateAsync(); 
+
+            var payload = new
+            {
+                type = javaType,
+                value = value
+            };
+
+            var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            });
+
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var url = $"API/bpm/caseVariable/{caseId}/{name}";
+            _logger.LogInformation("DEBUG SetCaseVariable: {Url} Body={Body}", url, json);
+
+            var resp = await _httpClient.PutAsync(url, content);
+            if (!resp.IsSuccessStatusCode)
+            {
+                var err = await resp.Content.ReadAsStringAsync();
+                _logger.LogError("❌ Error al setear variable de caso {Name} para caseId={CaseId}. Status={Status}. Body={Body}",
+                    name, caseId, resp.StatusCode, err);
+                resp.EnsureSuccessStatusCode();
+            }
+        }
+
+        private async Task InitializeCaseVariablesForProjectAsync(string caseId, Project project)
+        {
+            await SetCaseVariableAsync(caseId, "idProyecto", project.Id, "java.lang.Long");
+            await SetCaseVariableAsync(caseId, "projectName", project.Name, "java.lang.String");
+            await SetCaseVariableAsync(caseId, "responsableONG", project.CreatorEmail, "java.lang.String");
+
+            var recursos = project.Resources ?? new List<Resource>();
+
+            var pedidosPayload = recursos.Select(r => new
+            {
+                
+                titulo = r.Name,                 
+                descripcion = r.Name,            
+                contacto = r.ContactEmail,       
+                estado = string.IsNullOrEmpty(r.State) ? "pending" : r.State
+            });
+
+            var pedidosJson = JsonSerializer.Serialize(pedidosPayload);
+
+            await SetCaseVariableAsync(caseId, "pedidosJSON", pedidosJson, "java.lang.String");
+
+            var tituloPedido = project.Name;
+            var descripcionPedido = $"Proyecto {project.Name} creado desde la aplicación .NET";
+
+            var vencimientoPedido = project.EndDate.ToString("yyyy-MM-dd");
+
+            await SetCaseVariableAsync(caseId, "tituloPedido", tituloPedido, "java.lang.String");
+            await SetCaseVariableAsync(caseId, "descripcionPedido", descripcionPedido, "java.lang.String");
+            await SetCaseVariableAsync(caseId, "vencimientoPedido", vencimientoPedido, "java.lang.String");
+
+            await SetCaseVariableAsync(caseId, "etapald", 1, "java.lang.Integer");
+        }
+
 
 
 
