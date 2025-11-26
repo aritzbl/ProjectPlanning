@@ -68,7 +68,7 @@ namespace ProjectPlanning.Controllers
 
                     var processInstanceId = await _bonitaService.StartProcessInstanceAsync(project);
                     TempData["SuccessMessage"] = $"✅ Project created successfully!";
-
+                    await _bonitaService.StartMonitoringProcessesForActiveProjectsAsync(project);
                     _logger.LogInformation("Project {ProjectName} created with process instance {ProcessId}", project.Name, processInstanceId);
 
                     return RedirectToAction(nameof(Create));
@@ -77,6 +77,7 @@ namespace ProjectPlanning.Controllers
                 {
                     _logger.LogError(ex, "Error creating project {ProjectName}", project.Name);
                     TempData["ErrorMessage"] = "❌ Error creating project.";
+                    return View(project);
                 }
             }
 

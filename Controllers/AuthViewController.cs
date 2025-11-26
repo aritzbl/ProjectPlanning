@@ -14,6 +14,11 @@ namespace ProjectPlanning.Controllers
             return View();
         }
 
+        public IActionResult ResourceMenu()
+        {
+            return View();
+        }
+
         public IActionResult ProjectList()
         {
             return View();

@@ -66,13 +66,23 @@
                 console.log("✓ Login exitoso");
                 console.log("✓ Roles guardados:", json.roles);
                 
-                // Determinar redirección
+                // Determinar redirección según rol
                 const roles = json.roles || [];
                 const hasOfferingProjects = roles.some(r => 
                     String(r).toLowerCase().includes("offering_projects")
                 );
+                const hasOfferingResources = roles.some(r => 
+                    String(r).toLowerCase().includes("offering_resources")
+                );
 
-                const redirectUrl = hasOfferingProjects ? "/AuthView/OngMenu" : "/AuthView/ProjectList";
+                let redirectUrl;
+                if (hasOfferingProjects) {
+                    redirectUrl = "/AuthView/OngMenu"; // Menu para los que ofrecen proyectos
+                } else if (hasOfferingResources) {
+                    redirectUrl = "/AuthView/ResourceMenu"; // Menu para los que ofrecen recursos
+                } else {
+                    redirectUrl = "/AuthView/ProjectList"; // Vista por defecto
+                }
                 console.log("✓ Redirigiendo a:", redirectUrl);
 
                 resultDiv.textContent = "✅ Redirigiendo...";

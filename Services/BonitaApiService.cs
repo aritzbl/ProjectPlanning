@@ -11,7 +11,10 @@ namespace ProjectPlanning.Web.Services
         Task<bool> IsBonitaAvailableAsync();
         Task<List<BonitaProcess>> GetAvailableProcessesAsync();
         Task CompleteFirstTaskAsync(string caseId);
-        Task StartMonitoringProcessesForActiveProjectsAsync(List<Project> activeProjects);
+        Task StartMonitoringProcessesForActiveProjectsAsync(Project project);
+        Task<string?> GetActiveTaskIdAsync(string processInstanceId, string? taskName = null);
+        Task<bool> CompleteTaskAsync(string taskId, Dictionary<string, object>? variables = null);
+        Task<bool> CompleteTaskWithDecisionAsync(string taskId, Dictionary<string, object> decisionVariables);
     }
 
     public class BonitaApiService : IBonitaApiService
@@ -213,7 +216,7 @@ namespace ProjectPlanning.Web.Services
                 ProcessDefinitionId = processId,
                 Variables = new List<BonitaVariable>
                 {
-                    new() { Name = "projectName", Value = project.Name },
+                    new() { Name = "projectName", Value = project.Name ?? "" },
                     new() { Name = "startDate", Value = project.StartDate.ToString("yyyy-MM-dd") },
                     new() { Name = "endDate", Value = project.EndDate.ToString("yyyy-MM-dd") },
                     new() { Name = "resources", Value = project.Resources }
@@ -285,14 +288,8 @@ namespace ProjectPlanning.Web.Services
             }
         }
 
-        public async Task StartMonitoringProcessesForActiveProjectsAsync(List<Project> activeProjects)
+        public async Task StartMonitoringProcessesForActiveProjectsAsync(Project project)
         {
-            if (activeProjects == null || activeProjects.Count == 0)
-            {
-                _logger.LogInformation("No hay proyectos activos para iniciar el proceso de monitoreo.");
-                return;
-            }
-
             try
             {
                 await AuthenticateAsync();
@@ -300,14 +297,12 @@ namespace ProjectPlanning.Web.Services
                 // ID del proceso Monitoreo y Control
                 var processId = await GetProcessDefinitionIdAsync("Monitoreo"); 
 
-                foreach (var project in activeProjects)
-                {
                     var processInstance = new BonitaProcessInstance
                     {
                         ProcessDefinitionId = processId,
                         Variables = new List<BonitaVariable>
                         {
-                            new() { Name = "creatorEmail", Value = project.CreatorEmail },
+                            new() { Name = "creatorEmail", Value = project.CreatorEmail ?? "" },
                             new() { Name = "projectId", Value = project.Id }
                         }
                     };
@@ -330,11 +325,150 @@ namespace ProjectPlanning.Web.Services
                         _logger.LogError("❌ Falló al iniciar proceso de monitoreo para proyecto {ProjectId}: {Error}", project.Id, errorContent);
                     }
                 }
-            }
+            
             catch (Exception ex)
             {
                 _logger.LogError(ex, "⚠️ Error iniciando procesos de monitoreo para proyectos activos.");
                 throw;
+            }
+        }
+
+        public async Task<string?> GetActiveTaskIdAsync(string processInstanceId, string? taskName = null)
+        {
+            await AuthenticateAsync();
+
+            try
+            {
+                _logger.LogInformation("🔍 Buscando tarea activa para proceso {ProcessInstanceId}, tarea: {TaskName}", processInstanceId, taskName ?? "cualquiera");
+
+                var response = await _httpClient.GetAsync($"API/bpm/task?f=rootCaseId={processInstanceId}&f=state=ready&p=0&c=10");
+                var rawText = await response.Content.ReadAsStringAsync();
+                _logger.LogInformation("📨 Respuesta tareas activas: {Response}", rawText);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var tasks = JsonSerializer.Deserialize<List<JsonElement>>(rawText);
+
+                    if (tasks != null && tasks.Any())
+                    {
+                        JsonElement? selectedTask = null;
+
+                        if (!string.IsNullOrEmpty(taskName))
+                        {
+                            // Buscar tarea específica por nombre
+                            selectedTask = tasks.FirstOrDefault(t =>
+                                t.TryGetProperty("displayName", out var displayName) && 
+                                displayName.GetString()?.Contains(taskName, StringComparison.OrdinalIgnoreCase) == true &&
+                                t.TryGetProperty("state", out var state) && state.GetString() == "ready");
+                        }
+                        else
+                        {
+                            // Tomar la primera tarea disponible
+                            selectedTask = tasks.FirstOrDefault(t =>
+                                t.TryGetProperty("state", out var state) && state.GetString() == "ready");
+                        }
+
+                        if (selectedTask?.ValueKind != JsonValueKind.Undefined)
+                        {
+                            var taskId = selectedTask.Value.GetProperty("id").GetString() ?? "";
+                            _logger.LogInformation("✅ Tarea encontrada. ID: {TaskId}", taskId);
+                            return taskId;
+                        }
+                    }
+                }
+
+                _logger.LogWarning("⚠️ No se encontraron tareas activas para el proceso {ProcessInstanceId}", processInstanceId);
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ Error obteniendo tarea activa para proceso {ProcessInstanceId}", processInstanceId);
+                return null;
+            }
+        }
+
+        public async Task<bool> CompleteTaskAsync(string taskId, Dictionary<string, object>? variables = null)
+        {
+            await AuthenticateAsync();
+
+            try
+            {
+                _logger.LogInformation("🚀 Completando tarea {TaskId}", taskId);
+
+                // Asignar tarea al usuario actual
+                var assignResponse = await _httpClient.PostAsync($"API/bpm/userTask/{taskId}", 
+                    new StringContent($"{{\"assigned_id\":\"{_config.UserId}\"}}", Encoding.UTF8, "application/json"));
+
+                if (assignResponse.IsSuccessStatusCode)
+                {
+                    _logger.LogInformation("✅ Tarea {TaskId} asignada correctamente", taskId);
+                }
+
+                // Completar la tarea
+                var completeContent = new StringContent("{\"state\":\"completed\"}", Encoding.UTF8, "application/json");
+                var response = await _httpClient.PostAsync($"API/bpm/userTask/{taskId}/execution", completeContent);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    _logger.LogInformation("✅ Tarea {TaskId} completada exitosamente", taskId);
+                    return true;
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    _logger.LogError("❌ Error completando tarea {TaskId}. Status: {Status}, Error: {Error}", 
+                        taskId, response.StatusCode, errorContent);
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ Error completando tarea {TaskId}", taskId);
+                return false;
+            }
+        }
+
+        public async Task<bool> CompleteTaskWithDecisionAsync(string taskId, Dictionary<string, object> decisionVariables)
+        {
+            await AuthenticateAsync();
+
+            try
+            {
+                _logger.LogInformation("🚀 Completando tarea con decisión {TaskId}", taskId);
+
+                // Asignar tarea
+                var assignResponse = await _httpClient.PostAsync($"API/bpm/userTask/{taskId}", 
+                    new StringContent($"{{\"assigned_id\":\"{_config.UserId}\"}}", Encoding.UTF8, "application/json"));
+
+                if (assignResponse.IsSuccessStatusCode)
+                {
+                    _logger.LogInformation("✅ Tarea {TaskId} asignada correctamente", taskId);
+                }
+
+                // Preparar variables de decisión
+                var payload = new { state = "completed", variables = decisionVariables };
+                var jsonContent = JsonSerializer.Serialize(payload);
+                var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+                var response = await _httpClient.PostAsync($"API/bpm/userTask/{taskId}/execution", content);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    _logger.LogInformation("✅ Tarea con decisión {TaskId} completada exitosamente", taskId);
+                    return true;
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    _logger.LogError("❌ Error completando tarea con decisión {TaskId}. Status: {Status}, Error: {Error}", 
+                        taskId, response.StatusCode, errorContent);
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ Error completando tarea con decisión {TaskId}", taskId);
+                return false;
             }
         }
     }

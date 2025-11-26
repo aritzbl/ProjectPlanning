@@ -12,6 +12,8 @@ namespace ProjectPlanning.Web.Data
 
         public DbSet<Project> Projects { get; set; }
         public DbSet<Resource> Resources { get; set; }
+        public DbSet<Observation> Observations { get; set; }
+        public DbSet<ObservationAction> ObservationActions { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

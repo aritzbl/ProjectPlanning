@@ -6,3 +6,57 @@
     <h1 class="display-4">Welcome</h1>
     <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
 </div>
+
+<!-- Panel de prueba de flujo BPM (solo para desarrollo) -->
+<div class="row mt-5">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-cogs me-2"></i>
+                    Pruebas de Flujo BPM - Popups en la Aplicación
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">
+                    Los siguientes botones simulan los diferentes momentos del flujo BPM donde aparecen los popups:
+                </p>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <button class="btn btn-primary w-100" onclick="window.bmpFlowService.showSendProgressPopup(1)">
+                            <i class="fas fa-paper-plane me-2"></i>
+                            Mostrar: Confirmar Envío de Avances
+                        </button>
+                        <small class="text-muted">Se muestra después de completar una tarea del sistema</small>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <button class="btn btn-info w-100" onclick="window.bmpFlowService.showProgressDecisionPopup(1)">
+                            <i class="fas fa-balance-scale me-2"></i>
+                            Mostrar: Decisión sobre Avances
+                        </button>
+                        <small class="text-muted">Se muestra en la compuerta de decisión</small>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <button class="btn btn-warning w-100" onclick="window.bmpFlowService.showObservationsAvailablePopup(1)">
+                            <i class="fas fa-eye me-2"></i>
+                            Mostrar: Observaciones Disponibles
+                        </button>
+                        <small class="text-muted">Se muestra cuando hay observaciones para revisar</small>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <button class="btn btn-success w-100" onclick="window.bmpFlowService.showResolveObservationsPopup(1)">
+                            <i class="fas fa-check-circle me-2"></i>
+                            Mostrar: Resolver Observaciones
+                        </button>
+                        <small class="text-muted">Se muestra al finalizar el proceso</small>
+                    </div>
+                </div>
+                <div class="alert alert-info" role="alert">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Uso en producción:</strong> Estos popups se pueden llamar desde cualquier parte de la aplicación usando 
+                    <code>window.bmpFlowService.showXXXPopup(projectId)</code>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

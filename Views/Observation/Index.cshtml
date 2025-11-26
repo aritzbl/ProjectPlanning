@@ -1,0 +1,392 @@
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Observaciones - ProjectPlanning</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f7f8fa;
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        .navbar {
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+        }
+
+        .container-main {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+
+        .card {
+            border-radius: 12px;
+            border: none;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+            margin-bottom: 20px;
+        }
+
+        .project-card {
+            transition: transform 0.2s;
+            cursor: pointer;
+        }
+
+        .project-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+        }
+
+        .badge-days {
+            background: #17a2b8;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+        }
+
+        .badge-eligible {
+            background: #28a745;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+        }
+
+        .observation-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 4px solid #17a2b8;
+        }
+
+        .observation-resolved {
+            border-left-color: #28a745;
+            opacity: 0.7;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 60px;
+        }
+
+        .btn-add-observation {
+            background: #17a2b8;
+            color: white;
+            border: none;
+        }
+
+        .btn-add-observation:hover {
+            background: #138496;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-light bg-light d-flex justify-content-between px-4 py-3">
+        <span class="navbar-brand mb-0 h5">📝 Gestión de Observaciones</span>
+        <div>
+            <button class="btn btn-outline-secondary btn-sm me-2" onclick="goBack()">← Volver</button>
+            <button class="btn btn-outline-danger btn-sm" onclick="logout()">Cerrar sesión</button>
+        </div>
+    </nav>
+
+    <div class="container-main">
+        <div id="loading" class="loading">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Cargando...</span>
+            </div>
+            <p class="mt-3">Cargando proyectos...</p>
+        </div>
+
+        <div id="content" style="display: none;">
+            <div class="alert alert-info">
+                <strong>ℹ️ Información:</strong> Solo puedes agregar observaciones a proyectos donde ofreciste recursos (aceptados) y que llevan 15 o más días desde su fecha de inicio.
+            </div>
+
+            <h3 class="mb-4">Proyectos Donde Ofreciste Recursos</h3>
+            <div id="projectsList"></div>
+        </div>
+
+        <div id="noProjects" style="display: none;" class="text-center py-5">
+            <h3>📭 No hay proyectos elegibles</h3>
+            <p>No tienes proyectos donde hayas ofrecido recursos aceptados y que tengan 15 o más días de antigüedad.</p>
+        </div>
+    </div>
+
+    <!-- Modal para agregar observación -->
+    <div class="modal fade" id="addObservationModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Agregar Observación</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p><strong>Proyecto:</strong> <span id="modalProjectName"></span></p>
+                    <div class="mb-3">
+                        <label class="form-label">Observación</label>
+                        <textarea class="form-control" id="observationContent" rows="4" maxlength="1000" placeholder="Describe el avance o situación del proyecto..."></textarea>
+                        <small class="text-muted">Máximo 1000 caracteres</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="saveObservation()">Guardar Observación</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para ver observaciones -->
+    <div class="modal fade" id="viewObservationsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Observaciones del Proyecto</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p><strong>Proyecto:</strong> <span id="viewModalProjectName"></span></p>
+                    <div id="observationsList"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let currentProjectId = null;
+        let addObservationModal;
+        let viewObservationsModal;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            addObservationModal = new bootstrap.Modal(document.getElementById('addObservationModal'));
+            viewObservationsModal = new bootstrap.Modal(document.getElementById('viewObservationsModal'));
+            loadProjects();
+        });
+
+        async function loadProjects() {
+            try {
+                // Obtener el email ingresado en ResourceMenu
+                const email = localStorage.getItem("resourceOfferEmail");
+                if (!email) {
+                    alert("No se encontró el email. Por favor regresa al menú e ingresa tu email.");
+                    window.location.href = "/AuthView/ResourceMenu";
+                    return;
+                }
+
+                document.getElementById("loading").style.display = "block";
+                document.getElementById("content").style.display = "none";
+                document.getElementById("noProjects").style.display = "none";
+
+                const response = await fetch(`/api/projects/eligible-for-observations?email=${encodeURIComponent(email)}`);
+                if (!response.ok) throw new Error(`Error: ${response.status}`);
+
+                const projects = await response.json();
+
+                document.getElementById("loading").style.display = "none";
+
+                if (projects.length === 0) {
+                    document.getElementById("noProjects").style.display = "block";
+                    return;
+                }
+
+                document.getElementById("content").style.display = "block";
+                renderProjects(projects);
+            } catch (error) {
+                console.error("Error al cargar proyectos:", error);
+                document.getElementById("loading").innerHTML = `
+                    <div class="alert alert-danger">
+                        <h5>Error al cargar proyectos</h5>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        function renderProjects(projects) {
+            const container = document.getElementById("projectsList");
+            container.innerHTML = projects.map(project => `
+                <div class="card project-card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h5 class="card-title">${project.name}</h5>
+                                <p class="text-muted mb-2">
+                                    📅 Inicio: ${new Date(project.startDate).toLocaleDateString()}
+                                    | 🏁 Fin estimado: ${new Date(project.endDate).toLocaleDateString()}
+                                </p>
+                                <div>
+                                    <span class="badge-days">⏱️ ${project.daysSinceStart} días transcurridos</span>
+                                    ${project.observationCount > 0 ? `<span class="badge bg-info text-white ms-2">${project.observationCount} observación(es)</span>` : ''}
+                                    ${!project.canAddObservation ? `<span class="badge bg-warning text-dark ms-2">🔒 Disponible en ${15 - project.daysSinceLastAction} días</span>` : ''}
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                ${project.canAddObservation ? `
+                                    <button class="btn btn-primary btn-sm mb-2" onclick="openAddObservation(${project.id}, '${project.name}')">
+                                        ➕ Agregar Observación
+                                    </button>
+                                    <button class="btn btn-outline-warning btn-sm mb-2 d-block" onclick="declineObservation(${project.id}, '${project.name}')">
+                                        ⏭️ No quiero hacer observación
+                                    </button>
+                                ` : `
+                                    <button class="btn btn-secondary btn-sm mb-2" disabled>
+                                        🔒 No disponible aún
+                                    </button>
+                                `}
+                                ${project.observationCount > 0 ? `
+                                    <button class="btn btn-outline-secondary btn-sm" onclick="viewObservations(${project.id}, '${project.name}')">
+                                        👁️ Ver Observaciones
+                                    </button>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function openAddObservation(projectId, projectName) {
+            currentProjectId = projectId;
+            document.getElementById("modalProjectName").textContent = projectName;
+            document.getElementById("observationContent").value = "";
+            addObservationModal.show();
+        }
+
+        async function saveObservation() {
+            const content = document.getElementById("observationContent").value.trim();
+            const createdBy = localStorage.getItem("resourceOfferEmail");
+            
+            if (!content) {
+                alert("Por favor ingresa una observación");
+                return;
+            }
+
+            if (!createdBy) {
+                alert("No se pudo identificar el email. Por favor regresa al menú.");
+                window.location.href = "/AuthView/ResourceMenu";
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/projects/${currentProjectId}/observations`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        content,
+                        createdBy 
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.message || 'Error al guardar');
+                }
+
+                addObservationModal.hide();
+                alert("✅ Observación agregada correctamente");
+                loadProjects();
+            } catch (error) {
+                alert(`❌ ${error.message}`);
+            }
+        }
+
+        async function viewObservations(projectId, projectName) {
+            try {
+                document.getElementById("viewModalProjectName").textContent = projectName;
+                document.getElementById("observationsList").innerHTML = '<div class="text-center"><div class="spinner-border"></div></div>';
+                
+                viewObservationsModal.show();
+
+                const response = await fetch(`/api/projects/${projectId}/observations`);
+                if (!response.ok) throw new Error('Error al cargar observaciones');
+
+                const observations = await response.json();
+
+                if (observations.length === 0) {
+                    document.getElementById("observationsList").innerHTML = '<p class="text-muted">No hay observaciones aún</p>';
+                    return;
+                }
+
+                document.getElementById("observationsList").innerHTML = observations.map(obs => `
+                    <div class="observation-item ${obs.isResolved ? 'observation-resolved' : ''}">
+                        <div style="flex: 1;">
+                            <p class="mb-2">${obs.content}</p>
+                            <small class="text-muted">
+                                👤 ${obs.createdBy || 'Anónimo'} | 
+                                📅 ${new Date(obs.createdAt).toLocaleString()} |
+                                ${obs.isResolved 
+                                    ? '<span class="badge bg-success">✓ Resuelta</span>' 
+                                    : '<span class="badge bg-warning text-dark">⏳ Pendiente</span>'
+                                }
+                            </small>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                document.getElementById("observationsList").innerHTML = `<div class="alert alert-danger">${error.message}</div>`;
+            }
+        }
+
+        async function declineObservation(projectId, projectName) {
+            if (!confirm(`¿Estás seguro de que no quieres hacer una observación para "${projectName}"? No podrás hacer ninguna acción por 15 días más.`)) {
+                return;
+            }
+
+            try {
+                const userEmail = localStorage.getItem("resourceOfferEmail");
+                
+                if (!userEmail) {
+                    alert("No se pudo identificar el email. Por favor regresa al menú.");
+                    window.location.href = "/AuthView/ResourceMenu";
+                    return;
+                }
+
+                const response = await fetch(`/api/projects/${projectId}/decline-observation`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userEmail })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.message || 'Error al declinar');
+                }
+
+                alert("✅ Acción registrada. Podrás hacer una observación en 15 días.");
+                loadProjects();
+            } catch (error) {
+                alert(`❌ ${error.message}`);
+            }
+        }
+
+        function goBack() {
+            window.location.href = "/AuthView/ResourceMenu";
+        }
+
+        function logout() {
+            localStorage.clear();
+            window.location.href = "/AuthView/Login";
+        }
+
+        function checkSession() {
+            const sessionId = localStorage.getItem("bonitaSessionId");
+            if (!sessionId) {
+                window.location.href = "/AuthView/Login";
+                return false;
+            }
+            return true;
+        }
+
+        checkSession();
+    </script>
+</body>
+</html>

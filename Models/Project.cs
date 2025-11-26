@@ -30,6 +30,9 @@ namespace ProjectPlanning.Web.Models
         public string? ProcessInstanceId { get; set; } // ID del proceso en Bonita
         public DateTime? ActualEndDate { get; set; } // Fecha real de finalización (cuando Bonita termina el proceso)
         public string? ProcessStatus { get; set; } // Estado en Bonita: "active", "completed", "archived"
+        
+        // Relación con Observaciones
+        public List<Observation> Observations { get; set; } = new();
 
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {

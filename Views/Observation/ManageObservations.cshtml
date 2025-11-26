@@ -1,0 +1,235 @@
+@{
+    ViewData["Title"] = "Gestionar Observaciones de Proyectos";
+}
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>📋 Mis Proyectos con Observaciones</h2>
+        <a href="/AuthView/OngMenu" class="btn btn-secondary">← Volver al Menú</a>
+    </div>
+
+    <div class="alert alert-info">
+        <strong>ℹ️ Vista para ONG_Offering_Projects</strong>
+        <p class="mb-0">Aquí puedes ver todas las observaciones realizadas en tus proyectos y marcarlas como resueltas.</p>
+    </div>
+
+    <div id="loadingSpinner" class="text-center my-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Cargando...</span>
+        </div>
+        <p class="mt-2">Cargando proyectos...</p>
+    </div>
+
+    <div id="projectsContainer" class="row g-4" style="display: none;">
+        <!-- Se llenarán dinámicamente con JavaScript -->
+    </div>
+
+    <div id="noProjectsMessage" class="alert alert-warning" style="display: none;">
+        <strong>📭 No hay observaciones</strong>
+        <p class="mb-0">Actualmente no tienes proyectos con observaciones pendientes o resueltas.</p>
+    </div>
+</div>
+
+<!-- Modal para ver observaciones -->
+<div class="modal fade" id="observationsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalProjectTitle"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="observationsList"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .project-card {
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 20px;
+        background: white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .project-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .observation-item {
+        border-left: 4px solid #0d6efd;
+        padding: 15px;
+        margin-bottom: 15px;
+        background: #f8f9fa;
+        border-radius: 4px;
+    }
+    .observation-item.observation-resolved {
+        border-left-color: #198754;
+        background: #d1e7dd;
+    }
+    .badge-observations {
+        font-size: 0.9rem;
+        padding: 0.5rem 0.75rem;
+    }
+</style>
+
+<script>
+    let currentProjectId = null;
+    const bonitaUsername = localStorage.getItem("bonitaUsername");
+
+    if (!bonitaUsername) {
+        window.location.href = "/AuthView/Login";
+    }
+
+    async function loadProjects() {
+        try {
+            const response = await fetch(`/api/projects/with-observations?creatorEmail=${encodeURIComponent(bonitaUsername)}`);
+            
+            if (!response.ok) {
+                throw new Error(`Error: ${response.status}`);
+            }
+
+            const projects = await response.json();
+
+            document.getElementById("loadingSpinner").style.display = "none";
+
+            if (projects.length === 0) {
+                document.getElementById("noProjectsMessage").style.display = "block";
+                return;
+            }
+
+            document.getElementById("projectsContainer").style.display = "flex";
+            displayProjects(projects);
+
+        } catch (error) {
+            console.error("Error cargando proyectos:", error);
+            document.getElementById("loadingSpinner").style.display = "none";
+            document.getElementById("projectsContainer").innerHTML = 
+                '<div class="col-12"><div class="alert alert-danger">❌ Error al cargar los proyectos. Por favor, intenta de nuevo.</div></div>';
+        }
+    }
+
+    function displayProjects(projects) {
+        const container = document.getElementById("projectsContainer");
+        
+        container.innerHTML = projects.map(project => `
+            <div class="col-md-6 col-lg-4">
+                <div class="project-card">
+                    <h5 class="mb-3">${project.name}</h5>
+                    
+                    <div class="mb-3">
+                        <span class="badge badge-observations ${project.unresolvedObservations > 0 ? 'bg-warning text-dark' : 'bg-success'}">
+                            ${project.unresolvedObservations > 0 
+                                ? `⚠️ ${project.unresolvedObservations} pendiente${project.unresolvedObservations > 1 ? 's' : ''}`
+                                : '✓ Todas resueltas'}
+                        </span>
+                        <span class="badge badge-observations bg-info text-dark ms-2">
+                            📊 ${project.totalObservations} total${project.totalObservations > 1 ? 'es' : ''}
+                        </span>
+                    </div>
+
+                    <div class="mb-3">
+                        <small class="text-muted">
+                            📅 Inicio: ${new Date(project.startDate).toLocaleDateString()}
+                        </small>
+                    </div>
+
+                    <button class="btn btn-primary w-100" onclick="viewObservations(${project.id}, '${project.name}')">
+                        👁️ Ver Observaciones
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    async function viewObservations(projectId, projectName) {
+        currentProjectId = projectId;
+        document.getElementById("modalProjectTitle").textContent = `Observaciones de: ${projectName}`;
+
+        try {
+            const response = await fetch(`/api/projects/${projectId}/observations`);
+            
+            if (!response.ok) {
+                throw new Error(`Error: ${response.status}`);
+            }
+
+            const observations = await response.json();
+
+            if (observations.length === 0) {
+                document.getElementById("observationsList").innerHTML = 
+                    '<div class="alert alert-info">📭 No hay observaciones para este proyecto.</div>';
+            } else {
+                displayObservations(observations);
+            }
+
+            new bootstrap.Modal(document.getElementById('observationsModal')).show();
+
+        } catch (error) {
+            console.error("Error cargando observaciones:", error);
+            document.getElementById("observationsList").innerHTML = 
+                '<div class="alert alert-danger">❌ Error al cargar las observaciones.</div>';
+        }
+    }
+
+    function displayObservations(observations) {
+        document.getElementById("observationsList").innerHTML = observations.map(obs => `
+            <div class="observation-item ${obs.isResolved ? 'observation-resolved' : ''}">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div style="flex: 1;">
+                        <p class="mb-2"><strong>${obs.content}</strong></p>
+                        <small class="text-muted">
+                            👤 Creada por: ${obs.createdBy || 'Anónimo'} | 
+                            📅 ${new Date(obs.createdAt).toLocaleString()}
+                        </small>
+                    </div>
+                    <div class="ms-3">
+                        ${obs.isResolved 
+                            ? '<span class="badge bg-success">✓ Resuelta</span>' 
+                            : `<button class="btn btn-sm btn-success" onclick="resolveObservation(${obs.id})">
+                                 Marcar como resuelta
+                               </button>`
+                        }
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    async function resolveObservation(observationId) {
+        if (!confirm("¿Marcar esta observación como resuelta?")) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/observations/${observationId}/resolve`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (!response.ok) {
+                throw new Error(`Error: ${response.status}`);
+            }
+
+            // Recargar las observaciones del proyecto actual
+            const projectName = document.getElementById("modalProjectTitle").textContent.replace('Observaciones de: ', '');
+            await viewObservations(currentProjectId, projectName);
+            
+            // Recargar la lista de proyectos para actualizar los contadores
+            await loadProjects();
+
+            alert("✓ Observación marcada como resuelta");
+
+        } catch (error) {
+            console.error("Error resolviendo observación:", error);
+            alert("❌ Error al resolver la observación. Por favor, intenta de nuevo.");
+        }
+    }
+
+    // Cargar proyectos al iniciar
+    document.addEventListener('DOMContentLoaded', loadProjects);
+</script>

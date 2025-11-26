@@ -1,0 +1,339 @@
+@{
+    ViewData["Title"] = "Gestión de Flujo BPM";
+}
+
+<div class="container mt-4">
+    <h2>Gestión de Flujo BPM</h2>
+    
+    <!-- Modal para confirmar envío de avances -->
+    <div class="modal fade" id="sendProgressModal" tabindex="-1" aria-labelledby="sendProgressModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="sendProgressModalLabel">
+                        <i class="fas fa-paper-plane me-2"></i>
+                        Envío de Avances
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="text-center mb-3">
+                        <i class="fas fa-envelope fa-3x text-primary mb-3"></i>
+                        <h5>¿Has enviado los avances del proyecto por email?</h5>
+                        <p class="text-muted">Confirma que has enviado los avances del proyecto a los interesados correspondientes.</p>
+                    </div>
+                    <div class="alert alert-info" role="alert">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Importante:</strong> Una vez confirmado, el proceso avanzará automáticamente a la siguiente etapa.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-2"></i>Cancelar
+                    </button>
+                    <button type="button" class="btn btn-success" id="confirmSendProgress">
+                        <i class="fas fa-check me-2"></i>Sí, envié los avances
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para notificar observaciones disponibles -->
+    <div class="modal fade" id="observationsAvailableModal" tabindex="-1" aria-labelledby="observationsAvailableModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title" id="observationsAvailableModalLabel">
+                        <i class="fas fa-eye me-2"></i>
+                        Observaciones Disponibles
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="text-center mb-3">
+                        <i class="fas fa-clipboard-list fa-3x text-warning mb-3"></i>
+                        <h5>Tienes observaciones para revisar</h5>
+                        <p class="text-muted">Se han recibido observaciones sobre tu proyecto que requieren tu atención.</p>
+                    </div>
+                    <div class="alert alert-warning" role="alert">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Acción requerida:</strong> Revisa las observaciones antes de continuar con el proceso.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-2"></i>Cancelar
+                    </button>
+                    <button type="button" class="btn btn-warning" id="confirmObservationsReviewed">
+                        <i class="fas fa-check me-2"></i>Ya revisé las observaciones
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para resolver observaciones -->
+    <div class="modal fade" id="resolveObservationsModal" tabindex="-1" aria-labelledby="resolveObservationsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title" id="resolveObservationsModalLabel">
+                        <i class="fas fa-check-circle me-2"></i>
+                        Resolver Observaciones
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="text-center mb-3">
+                        <i class="fas fa-tasks fa-3x text-success mb-3"></i>
+                        <h5>¿Has resuelto todas las observaciones?</h5>
+                        <p class="text-muted">Confirma que has atendido y resuelto todas las observaciones recibidas.</p>
+                    </div>
+                    <div class="alert alert-success" role="alert">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Finalización:</strong> Al confirmar, el proceso se completará exitosamente.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-2"></i>Cancelar
+                    </button>
+                    <button type="button" class="btn btn-success" id="confirmObservationsResolved">
+                        <i class="fas fa-check-double me-2"></i>Sí, resolví las observaciones
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de confirmación de decisión de avances -->
+    <div class="modal fade" id="progressDecisionModal" tabindex="-1" aria-labelledby="progressDecisionModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-info text-white">
+                    <h5 class="modal-title" id="progressDecisionModalLabel">
+                        <i class="fas fa-balance-scale me-2"></i>
+                        Evaluación de Avances
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="text-center mb-3">
+                        <i class="fas fa-question-circle fa-3x text-info mb-3"></i>
+                        <h5>¿Los avances recibidos son satisfactorios?</h5>
+                        <p class="text-muted">Evalúa si los avances del proyecto cumplen con las expectativas y requerimientos.</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-danger" id="rejectProgress">
+                        <i class="fas fa-times me-2"></i>No, rechazar avances
+                    </button>
+                    <button type="button" class="btn btn-success" id="acceptProgress">
+                        <i class="fas fa-check me-2"></i>Sí, aceptar avances
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Área de mensajes -->
+    <div id="messageArea" class="mt-3"></div>
+
+    <!-- Botones de prueba (solo para desarrollo) -->
+    <div class="row mt-4" id="testButtons">
+        <div class="col-12">
+            <h4>Pruebas de Flujo BPM</h4>
+            <div class="btn-group-vertical d-grid gap-2">
+                <button class="btn btn-outline-primary" onclick="showSendProgressModal(1)">
+                    Mostrar: Envío de Avances
+                </button>
+                <button class="btn btn-outline-warning" onclick="showObservationsAvailableModal(1)">
+                    Mostrar: Observaciones Disponibles
+                </button>
+                <button class="btn btn-outline-success" onclick="showResolveObservationsModal(1)">
+                    Mostrar: Resolver Observaciones
+                </button>
+                <button class="btn btn-outline-info" onclick="showProgressDecisionModal(1)">
+                    Mostrar: Decisión de Avances
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    let currentProjectId = null;
+
+    // Funciones para mostrar modales
+    function showSendProgressModal(projectId) {
+        currentProjectId = projectId;
+        new bootstrap.Modal(document.getElementById('sendProgressModal')).show();
+    }
+
+    function showObservationsAvailableModal(projectId) {
+        currentProjectId = projectId;
+        new bootstrap.Modal(document.getElementById('observationsAvailableModal')).show();
+    }
+
+    function showResolveObservationsModal(projectId) {
+        currentProjectId = projectId;
+        new bootstrap.Modal(document.getElementById('resolveObservationsModal')).show();
+    }
+
+    function showProgressDecisionModal(projectId) {
+        currentProjectId = projectId;
+        new bootstrap.Modal(document.getElementById('progressDecisionModal')).show();
+    }
+
+    // Funciones para manejar las acciones
+    function showMessage(message, type = 'info') {
+        const messageArea = document.getElementById('messageArea');
+        const alertClass = type === 'error' ? 'alert-danger' : type === 'success' ? 'alert-success' : 'alert-info';
+        
+        messageArea.innerHTML = `
+            <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+                <i class="fas fa-${type === 'error' ? 'exclamation-circle' : type === 'success' ? 'check-circle' : 'info-circle'} me-2"></i>
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        `;
+    }
+
+    // Event listeners
+    document.getElementById('confirmSendProgress').addEventListener('click', async function() {
+        try {
+            const response = await fetch(`/api/BmpFlow/confirm-send-progress/${currentProjectId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({})
+            });
+
+            const result = await response.json();
+            
+            if (response.ok) {
+                showMessage(result.message, 'success');
+                bootstrap.Modal.getInstance(document.getElementById('sendProgressModal')).hide();
+                
+                // Automáticamente continuar al siguiente paso
+                setTimeout(() => {
+                    showProgressDecisionModal(currentProjectId);
+                }, 2000);
+            } else {
+                showMessage(result.message, 'error');
+            }
+        } catch (error) {
+            showMessage('Error de conexión: ' + error.message, 'error');
+        }
+    });
+
+    document.getElementById('acceptProgress').addEventListener('click', async function() {
+        try {
+            const response = await fetch(`/api/BmpFlow/evaluate-progress-gate/${currentProjectId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ progressAccepted: true })
+            });
+
+            const result = await response.json();
+            
+            if (response.ok) {
+                showMessage(result.message, 'success');
+                bootstrap.Modal.getInstance(document.getElementById('progressDecisionModal')).hide();
+                
+                if (result.action === 'show_observations_popup') {
+                    setTimeout(() => {
+                        showObservationsAvailableModal(currentProjectId);
+                    }, 2000);
+                }
+            } else {
+                showMessage(result.message, 'error');
+            }
+        } catch (error) {
+            showMessage('Error de conexión: ' + error.message, 'error');
+        }
+    });
+
+    document.getElementById('rejectProgress').addEventListener('click', async function() {
+        try {
+            const response = await fetch(`/api/BmpFlow/evaluate-progress-gate/${currentProjectId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ progressAccepted: false })
+            });
+
+            const result = await response.json();
+            
+            if (response.ok) {
+                showMessage(result.message, 'info');
+                bootstrap.Modal.getInstance(document.getElementById('progressDecisionModal')).hide();
+            } else {
+                showMessage(result.message, 'error');
+            }
+        } catch (error) {
+            showMessage('Error de conexión: ' + error.message, 'error');
+        }
+    });
+
+    document.getElementById('confirmObservationsReviewed').addEventListener('click', async function() {
+        try {
+            const response = await fetch(`/api/BmpFlow/confirm-observations-reviewed/${currentProjectId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+
+            const result = await response.json();
+            
+            if (response.ok) {
+                showMessage(result.message, 'success');
+                bootstrap.Modal.getInstance(document.getElementById('observationsAvailableModal')).hide();
+                
+                if (result.action === 'resolve_observations') {
+                    setTimeout(() => {
+                        showResolveObservationsModal(currentProjectId);
+                    }, 2000);
+                }
+            } else {
+                showMessage(result.message, 'error');
+            }
+        } catch (error) {
+            showMessage('Error de conexión: ' + error.message, 'error');
+        }
+    });
+
+    document.getElementById('confirmObservationsResolved').addEventListener('click', async function() {
+        try {
+            const response = await fetch(`/api/BmpFlow/resolve-observations-complete/${currentProjectId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+
+            const result = await response.json();
+            
+            if (response.ok) {
+                showMessage(result.message, 'success');
+                bootstrap.Modal.getInstance(document.getElementById('resolveObservationsModal')).hide();
+                
+                if (result.action === 'process_completed') {
+                    showMessage('🎉 ¡Proceso BPM completado exitosamente! El proyecto ha finalizado.', 'success');
+                }
+            } else {
+                showMessage(result.message, 'error');
+            }
+        } catch (error) {
+            showMessage('Error de conexión: ' + error.message, 'error');
+        }
+    });
+</script>
+}

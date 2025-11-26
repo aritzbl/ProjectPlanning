@@ -7,7 +7,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Menú ONG - ProjectPlanning</title>
+    <title>Menú Recursos - ProjectPlanning</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body {
@@ -73,7 +73,7 @@
         }
 
         .user-info {
-            background: #e3f2fd;
+            background: #e8f5e9;
             padding: 12px;
             border-radius: 8px;
             margin-bottom: 20px;
@@ -90,30 +90,48 @@
     <div class="card-menu mt-5">
         <div class="user-info">
             <strong>👤 Usuario:</strong> <span id="username"></span><br>
-            <strong>🏢 Rol:</strong> <span id="userRole"></span>
+            <strong>🏢 Rol:</strong> ONG que ofrece recursos
         </div>
 
-        <h2>Menú ONG</h2>
+        <h2>Menú Recursos</h2>
 
-        <button class="btn btn-primary menu-btn" onclick="window.location.href='/Project/Create'">
-            <span class="icon">📢</span> Publicar un proyecto
+        <button class="btn btn-success menu-btn" onclick="viewProjects()">
+            <span class="icon">🔍</span> Ver proyectos disponibles
         </button>
 
-        <button class="btn btn-outline-primary menu-btn" onclick="viewMyProjects()">
-            <span class="icon">📋</span> Ver mis proyectos
+        <button class="btn btn-outline-info menu-btn" onclick="showEmailModal()">
+            <span class="icon">📝</span> Gestionar Observaciones
         </button>
 
-        <button class="btn btn-outline-warning menu-btn" onclick="window.location.href='/Observation/ManageObservations'">
-            <span class="icon">👁️</span> Ver Observaciones de Mis Proyectos
-        </button>
-
-        <button class="btn btn-outline-success menu-btn" onclick="viewMetrics()">
-            <span class="icon">📊</span> Ver Métricas y Estadísticas
-        </button>
-
-        <p class="footer-note">Gestiona tus proyectos desde este panel</p>
+        <p class="footer-note">Gestiona tus recursos desde este panel</p>
     </div>
 
+    <!-- Modal para ingresar email -->
+    <div class="modal fade" id="emailModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Ingresa tu email</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Para gestionar observaciones, confirma el email con el que ofreciste recursos:</p>
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-control" id="resourceEmail" placeholder="tu@email.com" required>
+                        <small class="text-muted">Este email debe coincidir con el que usaste al ofrecer recursos en los proyectos.</small>
+                    </div>
+                    <div id="emailError" class="alert alert-danger" style="display: none;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="validateAndRedirect()">Continuar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         function checkBonitaAccess() {
             const sessionId = localStorage.getItem("bonitaSessionId");
@@ -121,7 +139,7 @@
             const rolesJson = localStorage.getItem("bonitaRoles");
             const username = localStorage.getItem("bonitaUsername");
 
-            console.log("Verificando acceso a OngMenu...");
+            console.log("Verificando acceso a ResourceMenu...");
             console.log("SessionId:", sessionId ? "✓" : "✗");
             console.log("ApiToken:", apiToken ? "✓" : "✗");
 
@@ -138,26 +156,46 @@
             const roles = JSON.parse(rolesJson || "[]");
             console.log("Roles:", roles);
 
-            // Verificar que tiene rol de offering projects
-            const hasOfferingProjects = roles.some(r => 
-                String(r).toLowerCase().includes("offering_projects")
+            // Verificar que tiene rol de offering resources
+            const hasOfferingResources = roles.some(r => 
+                String(r).toLowerCase().includes("offering_resources")
             );
 
-            if (!hasOfferingProjects) {
-                console.warn("Usuario NO tiene rol de offering projects, redirigiendo a ResourceMenu...");
-                window.location.href = "/AuthView/ResourceMenu";
-                return;
+            if (!hasOfferingResources) {
+                console.warn("Usuario NO tiene rol de offering resources, redirigiendo a OngMenu...");
+                window.location.href = "/AuthView/OngMenu";
             }
-
-            document.getElementById("userRole").textContent = "ONG que ofrece proyectos";
         }
 
-        function viewMyProjects() {
+        function viewProjects() {
             window.location.href = "/AuthView/ProjectList";
         }
 
-        function viewMetrics() {
-            window.location.href = "/Metrics/Index";
+        function showEmailModal() {
+            const modal = new bootstrap.Modal(document.getElementById('emailModal'));
+            // Pre-rellenar con el username de localStorage si existe
+            const username = localStorage.getItem("bonitaUsername");
+            if (username) {
+                document.getElementById("resourceEmail").value = username;
+            }
+            modal.show();
+        }
+
+        async function validateAndRedirect() {
+            const email = document.getElementById("resourceEmail").value.trim();
+            const errorDiv = document.getElementById("emailError");
+            
+            if (!email) {
+                errorDiv.textContent = "Por favor ingresa un email.";
+                errorDiv.style.display = "block";
+                return;
+            }
+
+            // Guardar el email en localStorage para que la vista de observaciones lo use
+            localStorage.setItem("resourceOfferEmail", email);
+            
+            // Redirigir a la vista de observaciones
+            window.location.href = "/Observation/Index";
         }
 
         function logout() {
