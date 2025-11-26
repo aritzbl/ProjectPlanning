@@ -26,6 +26,8 @@ namespace ProjectPlanning.Web.Models
         [EmailAddress(ErrorMessage = "Invalid email format")]
         public string? CreatorEmail { get; set; }
 
+        public string? BonitaCaseId{ get; set; }
+
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {
             var today = DateTime.Today;
