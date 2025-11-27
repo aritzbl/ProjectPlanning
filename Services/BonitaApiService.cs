@@ -15,6 +15,7 @@ namespace ProjectPlanning.Web.Services
         Task<string?> GetActiveTaskIdAsync(string processInstanceId, string? taskName = null);
         Task<bool> CompleteTaskAsync(string taskId, Dictionary<string, object>? variables = null);
         Task<bool> CompleteTaskWithDecisionAsync(string taskId, Dictionary<string, object> decisionVariables);
+        Task PublishProjectTaskAsync(string caseId);
     }
 
     public class BonitaApiService : IBonitaApiService
@@ -33,6 +34,7 @@ namespace ProjectPlanning.Web.Services
             _httpClient.BaseAddress = new Uri(_config.BaseUrl);
         }
 
+        // ...existing code...
         public async Task<bool> IsBonitaAvailableAsync()
         {
             try
@@ -59,13 +61,15 @@ namespace ProjectPlanning.Web.Services
             try
             {
                 await AuthenticateAsync();
-                var processId = await GetProcessDefinitionIdAsync("Notificar ONGs");
+                var processId = await GetProcessDefinitionIdAsync("NotificarONGs");
 
                 var processInstance = CreateProcessInstance(project, processId);
                 var json = JsonSerializer.Serialize(processInstance, new JsonSerializerOptions
                 {
                     PropertyNamingPolicy = JsonNamingPolicy.CamelCase
                 });
+
+                _logger.LogInformation("DEBUG Bonita instantiation JSON: {Json}", json);
 
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
                 var response = await _httpClient.PostAsync($"API/bpm/process/{processId}/instantiation", content);
@@ -84,7 +88,16 @@ namespace ProjectPlanning.Web.Services
                     _logger.LogInformation("✅ Proceso iniciado correctamente con ID: {CaseId}", caseId);
 
                     if (caseId != "Unknown")
-                        await CompleteFirstTaskAsync(caseId);
+                    {
+                        // 1) Inicializamos variables de caso (idProyecto, projectName, pedidosJSON, etc.)
+                        await InitializeCaseVariablesForProjectAsync(caseId, project);
+
+                        // 2) Ejecutamos la tarea "Publicar proyecto"
+                        await PublishProjectTaskAsync(caseId);
+
+                        // 3) Ejecutamos la siguiente tarea humana (donde está el conector CrearPedido_API)
+                        await CompleteNextTaskForCaseAsync(caseId);
+                    }
 
                     return caseId;
                 }
@@ -103,63 +116,40 @@ namespace ProjectPlanning.Web.Services
             }
         }
 
+
+
         private async Task AuthenticateAsync()
         {
             if (!string.IsNullOrEmpty(_sessionId) && !string.IsNullOrEmpty(_apiToken))
                 return;
 
-            try
+            var loginData = new Dictionary<string, string>
             {
-                var loginData = new Dictionary<string, string>
-                {
-                    { "username", _config.Username },
-                    { "password", _config.Password },
-                    { "redirect", "false" }
-                };
+                { "username", _config.Username },
+                { "password", _config.Password },
+                { "redirect", "false" }
+            };
 
-                var content = new FormUrlEncodedContent(loginData);
-                var response = await _httpClient.PostAsync("loginservice", content);
+            var content = new FormUrlEncodedContent(loginData);
+            var response = await _httpClient.PostAsync("loginservice", content);
 
-                if (response.IsSuccessStatusCode)
-                {
-                    if (response.Headers.TryGetValues("Set-Cookie", out var cookieHeaders))
-                    {
-                        var cookieString = string.Join(",", cookieHeaders);
-                        var sessionMatch = System.Text.RegularExpressions.Regex.Match(cookieString, @"JSESSIONID=([^;,]+)");
-                        if (sessionMatch.Success) _sessionId = sessionMatch.Groups[1].Value;
+            var cookies = response.Headers.GetValues("Set-Cookie");
+            var cookieString = string.Join(",", cookies);
 
-                        var tokenMatch = System.Text.RegularExpressions.Regex.Match(cookieString, @"X-Bonita-API-Token=([^;,]+)");
-                        if (tokenMatch.Success) _apiToken = tokenMatch.Groups[1].Value;
+            _sessionId = RegexHelper(cookieString, "JSESSIONID");
+            _apiToken = RegexHelper(cookieString, "X-Bonita-API-Token");
 
-                        _httpClient.DefaultRequestHeaders.Remove("Cookie");
-                        _httpClient.DefaultRequestHeaders.Remove("X-Bonita-API-Token");
+            _httpClient.DefaultRequestHeaders.Remove("Cookie");
+            _httpClient.DefaultRequestHeaders.Remove("X-Bonita-API-Token");
 
-                        if (!string.IsNullOrEmpty(_sessionId))
-                            _httpClient.DefaultRequestHeaders.Add("Cookie", $"JSESSIONID={_sessionId}");
-                        if (!string.IsNullOrEmpty(_apiToken))
-                            _httpClient.DefaultRequestHeaders.Add("X-Bonita-API-Token", _apiToken);
+            _httpClient.DefaultRequestHeaders.Add("Cookie", $"JSESSIONID={_sessionId}");
+            _httpClient.DefaultRequestHeaders.Add("X-Bonita-API-Token", _apiToken);
+        }
 
-                        _logger.LogInformation("✅ Successfully authenticated with Bonita. SessionId: {SessionId}, ApiToken: {ApiToken}",
-                            _sessionId, _apiToken);
-                    }
-                    else
-                    {
-                        _logger.LogWarning("⚠️ No Set-Cookie headers found in authentication response");
-                    }
-                }
-                else
-                {
-                    var errorContent = await response.Content.ReadAsStringAsync();
-                    _logger.LogError("❌ Authentication failed. Status: {StatusCode}, Error: {Error}",
-                        response.StatusCode, errorContent);
-                    throw new Exception($"Authentication failed: {response.StatusCode}");
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "⚠️ Error during Bonita authentication");
-                throw;
-            }
+        private string? RegexHelper(string cookieString, string key)
+        {
+            var match = System.Text.RegularExpressions.Regex.Match(cookieString, $"{key}=([^;,]+)");
+            return match.Success ? match.Groups[1].Value : null;
         }
 
         public async Task<string> GetProcessDefinitionIdAsync(string processName)
@@ -172,11 +162,26 @@ namespace ProjectPlanning.Web.Services
             var json = await response.Content.ReadAsStringAsync();
             var list = JsonSerializer.Deserialize<List<JsonElement>>(json);
 
-            if (list != null && list.Count > 0)
-                return list[0].GetProperty("id").GetString() ?? throw new Exception("Process ID is null");
+            if (list == null || list.Count == 0)
+                throw new Exception($"Process '{processName}' not found in Bonita.");
 
-            throw new Exception($"Process '{processName}' not found in Bonita.");
+            // ELEGIR LA VERSIÓN MÁS ALTA
+            JsonElement best = list[0];
+            foreach (var p in list)
+            {
+                string vBest = best.GetProperty("version").GetString() ?? "0";
+                string vCur = p.GetProperty("version").GetString() ?? "0";
+
+                // si la versión actual es mayor, reemplazar
+                if (string.Compare(vCur, vBest, StringComparison.Ordinal) > 0)
+                    best = p;
+            }
+
+            return best.GetProperty("id").GetString()
+                ?? throw new Exception("Process ID is null");
         }
+
+
 
         public async Task<List<BonitaProcess>> GetAvailableProcessesAsync()
         {
@@ -214,15 +219,10 @@ namespace ProjectPlanning.Web.Services
             return new BonitaProcessInstance
             {
                 ProcessDefinitionId = processId,
-                Variables = new List<BonitaVariable>
-                {
-                    new() { Name = "projectName", Value = project.Name ?? "" },
-                    new() { Name = "startDate", Value = project.StartDate.ToString("yyyy-MM-dd") },
-                    new() { Name = "endDate", Value = project.EndDate.ToString("yyyy-MM-dd") },
-                    new() { Name = "resources", Value = project.Resources }
-                }
+                Variables = BonitaProjectMapper.MapFromProject(project)
             };
         }
+
 
         public async Task CompleteFirstTaskAsync(string caseId)
         {
@@ -471,8 +471,218 @@ namespace ProjectPlanning.Web.Services
                 return false;
             }
         }
-    }
 
+        public async Task CompleteNextTaskForCaseAsync(string caseId)
+        {
+            await AuthenticateAsync();
+
+            // 1) Buscar la próxima tarea humana READY del caseId
+            var resp = await _httpClient.GetAsync(
+                $"API/bpm/humanTask?p=0&c=1&f=caseId={caseId}&f=state=ready");
+
+            resp.EnsureSuccessStatusCode();
+            var json = await resp.Content.ReadAsStringAsync();
+            var tasks = JsonSerializer.Deserialize<List<JsonElement>>(json) ?? new();
+
+            if (!tasks.Any())
+            {
+                _logger.LogInformation("⚠️ No hay tareas READY para el caseId {CaseId}", caseId);
+                return;
+            }
+
+            var task = tasks[0];
+            var taskId = task.GetProperty("id").GetString();
+            var name = task.GetProperty("name").GetString();
+
+            _logger.LogInformation("🟢 Completando tarea {Name} (ID={TaskId})", name, taskId);
+
+            // 2) Asignar la tarea
+            var assignBody = new { assigned_id = _config.UserId };
+            var assignContent = new StringContent(
+                JsonSerializer.Serialize(assignBody),
+                Encoding.UTF8, "application/json");
+
+            var assignResp = await _httpClient.PutAsync($"API/bpm/humanTask/{taskId}", assignContent);
+            assignResp.EnsureSuccessStatusCode();
+
+            // 3) Ejecutar la tarea
+            var execContent = new StringContent("{}", Encoding.UTF8, "application/json");
+            var execResp = await _httpClient.PostAsync(
+                $"API/bpm/userTask/{taskId}/execution",
+                execContent);
+
+            execResp.EnsureSuccessStatusCode();
+
+            _logger.LogInformation("🏁 Tarea {TaskId} completada correctamente.", taskId);
+        }
+
+        
+        public async Task PublishProjectTaskAsync(string caseId)
+        {
+            await AuthenticateAsync();
+
+            // Vamos a reintentar varias veces, por si la tarea todavía no está lista
+            const int maxRetries = 10;
+            const int delayMs = 1000;
+
+            for (int attempt = 1; attempt <= maxRetries; attempt++)
+            {
+                // 1) Pedimos las tareas READY del proceso usando rootCaseId
+                var url = $"API/bpm/humanTask?p=0&c=10&f=rootCaseId={caseId}&f=state=ready";
+                var resp = await _httpClient.GetAsync(url);
+
+                var json = await resp.Content.ReadAsStringAsync();
+                _logger.LogInformation(
+                    "🔥 (Intento {Attempt}/{Max}) Tareas READY para rootCaseId={CaseId}: {Json}",
+                    attempt, maxRetries, caseId, json);
+
+                resp.EnsureSuccessStatusCode();
+
+                var tasks = JsonSerializer.Deserialize<List<JsonElement>>(json) ?? new();
+
+                if (!tasks.Any())
+                {
+                    _logger.LogWarning(
+                        "⚠️ (Intento {Attempt}/{Max}) No hay tareas READY aún para rootCaseId={CaseId}.",
+                        attempt, maxRetries, caseId);
+
+                    if (attempt < maxRetries)
+                    {
+                        await Task.Delay(delayMs);
+                        continue;
+                    }
+                    else
+                    {
+                        _logger.LogError(
+                            "❌ No se encontraron tareas READY para rootCaseId={CaseId} después de {Max} intentos.",
+                            caseId, maxRetries);
+                        return;
+                    }
+                }
+
+                // 2) Buscar la tarea cuyo displayName contenga 'Publicar'
+                var task = tasks.FirstOrDefault(t =>
+                    t.TryGetProperty("displayName", out var displayNameProp) &&
+                    displayNameProp.GetString()!
+                        .Contains("Publicar", StringComparison.OrdinalIgnoreCase));
+
+                
+                if (task.ValueKind == JsonValueKind.Undefined)
+                {
+                    task = tasks[0];
+
+                    var dn = task.TryGetProperty("displayName", out var dnProp)
+                        ? dnProp.GetString()
+                        : "(sin displayName)";
+
+                    _logger.LogWarning(
+                        "⚠️ No se encontró tarea con 'Publicar' en displayName. " +
+                        "Se ejecutará la primera tarea READY: {DisplayName}",
+                        dn);
+                }
+
+                var taskId = task.GetProperty("id").GetString();
+                var displayName = task.GetProperty("displayName").GetString();
+
+                _logger.LogInformation(
+                    "🟢 Ejecutando tarea {DisplayName} (ID={TaskId}) para rootCaseId {CaseId}",
+                    displayName, taskId, caseId);  
+
+                // 3) Asignar la tarea al usuario configurado
+                var assignBody = new { assigned_id = _config.UserId };
+                var assignContent = new StringContent(
+                    JsonSerializer.Serialize(assignBody),
+                    Encoding.UTF8,
+                    "application/json");
+
+                var assignResp = await _httpClient.PutAsync($"API/bpm/humanTask/{taskId}", assignContent);
+                assignResp.EnsureSuccessStatusCode();
+                _logger.LogInformation(
+                    "✅ Tarea {TaskId} asignada correctamente al usuario {UserId}.",
+                    taskId, _config.UserId);
+
+                // 4) Ejecutar la tarea
+                var execContent = new StringContent("{}", Encoding.UTF8, "application/json");
+                var execResp = await _httpClient.PostAsync(
+                    $"API/bpm/userTask/{taskId}/execution",
+                    execContent);
+                execResp.EnsureSuccessStatusCode();
+
+                _logger.LogInformation(
+                    "🏁 Tarea '{DisplayName}' completada correctamente (TaskId={TaskId}).",
+                    displayName, taskId);
+
+                return;
+            }
+        }
+
+        private async Task SetCaseVariableAsync(string caseId, string name, object value, string javaType)
+        {
+            await AuthenticateAsync(); 
+
+            var payload = new
+            {
+                type = javaType,
+                value = value
+            };
+
+            var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            });
+
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var url = $"API/bpm/caseVariable/{caseId}/{name}";
+            _logger.LogInformation("DEBUG SetCaseVariable: {Url} Body={Body}", url, json);
+
+            var resp = await _httpClient.PutAsync(url, content);
+            if (!resp.IsSuccessStatusCode)
+            {
+                var err = await resp.Content.ReadAsStringAsync();
+                _logger.LogError("❌ Error al setear variable de caso {Name} para caseId={CaseId}. Status={Status}. Body={Body}",
+                    name, caseId, resp.StatusCode, err);
+                resp.EnsureSuccessStatusCode();
+            }
+        }
+
+        private async Task InitializeCaseVariablesForProjectAsync(string caseId, Project project)
+        {
+            await SetCaseVariableAsync(caseId, "idProyecto", project.Id, "java.lang.Long");
+            await SetCaseVariableAsync(caseId, "projectName", project.Name, "java.lang.String");
+            await SetCaseVariableAsync(caseId, "responsableONG", project.CreatorEmail, "java.lang.String");
+
+            var recursos = project.Resources ?? new List<Resource>();
+
+            var pedidosPayload = recursos.Select(r => new
+            {
+                
+                titulo = r.Name,                 
+                descripcion = r.Name,            
+                contacto = r.ContactEmail,       
+                estado = string.IsNullOrEmpty(r.State) ? "pending" : r.State
+            });
+
+            var pedidosJson = JsonSerializer.Serialize(pedidosPayload);
+
+            await SetCaseVariableAsync(caseId, "pedidosJSON", pedidosJson, "java.lang.String");
+
+            var tituloPedido = project.Name;
+            var descripcionPedido = $"Proyecto {project.Name} creado desde la aplicación .NET";
+
+            var vencimientoPedido = project.EndDate.ToString("yyyy-MM-dd");
+
+            await SetCaseVariableAsync(caseId, "tituloPedido", tituloPedido, "java.lang.String");
+            await SetCaseVariableAsync(caseId, "descripcionPedido", descripcionPedido, "java.lang.String");
+            await SetCaseVariableAsync(caseId, "vencimientoPedido", vencimientoPedido, "java.lang.String");
+
+            await SetCaseVariableAsync(caseId, "etapald", 1, "java.lang.Integer");
+        }
+
+
+
+
+    }
     public class BonitaProcess
     {
         public string Id { get; set; } = string.Empty;

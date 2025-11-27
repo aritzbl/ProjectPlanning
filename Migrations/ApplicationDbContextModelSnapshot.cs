@@ -95,6 +95,9 @@ namespace projectplanning.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("BonitaCaseId")
+                        .HasColumnType("text");
+
                     b.Property<DateTime?>("ActualEndDate")
                         .HasColumnType("timestamp with time zone");
 

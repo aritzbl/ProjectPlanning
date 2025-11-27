@@ -27,7 +27,7 @@ namespace ProjectPlanning.Controllers
             ViewBag.IsBonitaAvailable = isBonitaAvailable;
 
             if (!isBonitaAvailable)
-                TempData["ErrorMessage"] = "⚠️ Bonita BPM is not available. Please check the connection.";
+                TempData["ErrorMessage"] = "⚠️ Bonita BPM is not available.";
 
             return View(new Project());
         }
@@ -37,52 +37,49 @@ namespace ProjectPlanning.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(Project project)
         {
-            if (ModelState.IsValid)
+            if (!ModelState.IsValid)
+                return View(project);
+
+            try
             {
-                try
+                project.StartDate = DateTime.SpecifyKind(project.StartDate, DateTimeKind.Utc);
+                project.EndDate = DateTime.SpecifyKind(project.EndDate, DateTimeKind.Utc);
+
+                if (project.Resources != null)
                 {
-                    // Convertir fechas a UTC para postgres
-                    project.StartDate = DateTime.SpecifyKind(project.StartDate, DateTimeKind.Utc);
-                    project.EndDate = DateTime.SpecifyKind(project.EndDate, DateTimeKind.Utc);
-
-                    if (project.Resources != null)
-                    {
-                        foreach (var resource in project.Resources)
-                        {
-                            resource.Project = project;
-                        }
-                    }
-
-                    _context.Projects.Add(project);
-                    await _context.SaveChangesAsync();
-
-                    _logger.LogInformation("Project saved to DB with Id: {ProjectId}", project.Id);
-
-                    // Iniciar proceso en Bonita
-                    var isBonitaAvailable = await _bonitaService.IsBonitaAvailableAsync();
-                    if (!isBonitaAvailable)
-                    {
-                        TempData["ErrorMessage"] = "⚠️ Bonita BPM is not available.";
-                        return View(project);
-                    }
-
-                    var processInstanceId = await _bonitaService.StartProcessInstanceAsync(project);
-                    TempData["SuccessMessage"] = $"✅ Project created successfully!";
-                    await _bonitaService.StartMonitoringProcessesForActiveProjectsAsync(project);
-                    _logger.LogInformation("Project {ProjectName} created with process instance {ProcessId}", project.Name, processInstanceId);
-
-                    return RedirectToAction(nameof(Create));
+                    foreach (var r in project.Resources)
+                        r.Project = project;
                 }
-                catch (Exception ex)
+
+                _context.Projects.Add(project);
+                await _context.SaveChangesAsync();
+
+                if (!await _bonitaService.IsBonitaAvailableAsync())
                 {
-                    _logger.LogError(ex, "Error creating project {ProjectName}", project.Name);
-                    TempData["ErrorMessage"] = "❌ Error creating project.";
+                    TempData["ErrorMessage"] = "Bonita BPM is not available.";
                     return View(project);
                 }
-            }
 
-            return View(project);
+                // 🚀 Esto inicia el proceso y, por lo que cambiamos recién,
+                // TAMBIÉN ejecuta la tarea 'Publicar proyecto'
+                var caseId = await _bonitaService.StartProcessInstanceAsync(project);
+                    await _bonitaService.StartMonitoringProcessesForActiveProjectsAsync(project);
+                project.BonitaCaseId = caseId;
+                _context.Projects.Update(project);
+                await _context.SaveChangesAsync();
+
+                TempData["SuccessMessage"] = "Proyecto creado, publicado y proceso Bonita iniciado.";
+                return RedirectToAction(nameof(Create));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating project {ProjectName}", project.Name);
+                TempData["ErrorMessage"] = "Error creating project.";
+                    return View(project);
+                return View(project);
+            }
         }
+
 
         // GET: todos los proyectos
         [HttpGet]
@@ -201,5 +198,23 @@ namespace ProjectPlanning.Controllers
                 return StatusCode(500, new { message = "Error interno del servidor." });
             }
         }
+
+        [HttpPost]
+        public async Task<IActionResult> PublishProject(int id)
+        {
+            var project = await _context.Projects.FirstOrDefaultAsync(p => p.Id == id);
+
+            if (project == null || string.IsNullOrEmpty(project.BonitaCaseId))
+            {
+                TempData["Error"] = "Proyecto no encontrado o sin CaseId.";
+                return RedirectToAction("ProjectList", "AuthView");
+            }
+
+            await _bonitaService.PublishProjectTaskAsync(project.BonitaCaseId);
+
+            TempData["Success"] = "Tarea 'Publicar proyecto' ejecutada en Bonita.";
+            return RedirectToAction("ProjectList", "AuthView");
+        }
+
     }
 }
